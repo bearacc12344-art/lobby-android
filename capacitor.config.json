@@ -1,0 +1,15 @@
+{
+  "appId": "com.lobby.chat",
+  "appName": "Lobby",
+  "webDir": "dist",
+  "android": {
+    "allowMixedContent": true,
+    "backgroundColor": "#15100d",
+    "webContentsDebuggingEnabled": false
+  },
+  "server": { "androidScheme": "https" },
+  "plugins": {
+    "Keyboard": { "resize": "body" },
+    "LocalNotifications": { "smallIcon": "ic_stat_lobby", "iconColor": "#d9a441" }
+  }
+}

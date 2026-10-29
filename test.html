@@ -1,0 +1,7 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Lobby backend test</title></head>
+<body><pre id="log"></pre><script type="module">
+import { P2PNet } from './src/net/backend.js';
+import { Store } from './src/net/store.js';
+window.LobbyTest = { P2PNet, Store };
+document.getElementById('log').textContent = 'ready';
+</script></body></html>

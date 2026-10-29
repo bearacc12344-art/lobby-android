@@ -1,0 +1,57 @@
+name: Build Lobby APK
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+          cache: gradle
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Build the web app
+        run: |
+          npm ci
+          npm run build
+          npx cap sync android
+
+      - name: Build the APK
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon --stacktrace
+
+      - name: Rename
+        run: cp android/app/build/outputs/apk/release/app-release.apk Lobby.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Lobby-apk
+          path: Lobby.apk
+
+      - name: Publish as a release (direct download link for phones)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: Lobby for Android (build ${{ github.run_number }})
+          body: Tap **Lobby.apk** below to download, then open it to install (allow "install unknown apps" if asked).
+          files: Lobby.apk
+          make_latest: true

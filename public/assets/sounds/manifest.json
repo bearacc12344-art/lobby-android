@@ -1,0 +1,82 @@
+{
+ "normal": {
+  "message": "normal_message.wav",
+  "mention": "normal_mention.wav",
+  "sent": "normal_sent.wav",
+  "join": "normal_join.wav",
+  "leave": "normal_leave.wav",
+  "mute": "normal_mute.wav",
+  "unmute": "normal_unmute.wav",
+  "nudge": "normal_nudge.wav",
+  "ring": "normal_ring.wav",
+  "outgoing": "normal_outgoing.wav",
+  "friend": "normal_friend.wav",
+  "error": "normal_error.wav"
+ },
+ "halloween": {
+  "ring": "halloween_ring.wav",
+  "outgoing": "halloween_outgoing.wav",
+  "message": "halloween_message.wav",
+  "mention": "halloween_mention.wav",
+  "friend": "halloween_friend.wav",
+  "nudge": "halloween_nudge.wav",
+  "join": "halloween_join.wav",
+  "leave": "halloween_leave.wav"
+ },
+ "christmas": {
+  "ring": "christmas_ring.wav",
+  "outgoing": "christmas_outgoing.wav",
+  "message": "christmas_message.wav",
+  "mention": "christmas_mention.wav",
+  "friend": "christmas_friend.wav",
+  "nudge": "christmas_nudge.wav",
+  "join": "christmas_join.wav",
+  "leave": "christmas_leave.wav"
+ },
+ "board": [
+  {
+   "name": "Knock knock",
+   "emoji": "🚪",
+   "file": "board_0.wav"
+  },
+  {
+   "name": "Boom",
+   "emoji": "💥",
+   "file": "board_1.wav"
+  },
+  {
+   "name": "Airhorn",
+   "emoji": "📯",
+   "file": "board_2.wav"
+  },
+  {
+   "name": "Sad trombone",
+   "emoji": "🎺",
+   "file": "board_3.wav"
+  },
+  {
+   "name": "Ding",
+   "emoji": "🔔",
+   "file": "board_4.wav"
+  },
+  {
+   "name": "Boing",
+   "emoji": "🤸",
+   "file": "board_5.wav"
+  },
+  {
+   "name": "Ba dum tss",
+   "emoji": "🥁",
+   "file": "board_6.wav"
+  },
+  {
+   "name": "Seek eyes",
+   "emoji": "👁️",
+   "file": "board_7.wav"
+  }
+ ],
+ "looped": [
+  "ring",
+  "outgoing"
+ ]
+}
