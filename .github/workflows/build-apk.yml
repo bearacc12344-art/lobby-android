@@ -10,22 +10,26 @@ permissions:
 
 jobs:
   apk:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 20
           cache: npm
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 17
           cache: gradle
 
-      - uses: android-actions/setup-android@v3
+      - name: Android SDK (preinstalled on the runner)
+        run: |
+          echo "ANDROID_HOME=$ANDROID_SDK_ROOT"
+          yes | "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+          "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" "platforms;android-34" "build-tools;34.0.0" > /dev/null
 
       - name: Build the web app
         run: |
@@ -37,7 +41,12 @@ jobs:
         working-directory: android
         run: |
           chmod +x gradlew
-          ./gradlew assembleRelease --no-daemon --stacktrace
+          ./gradlew assembleRelease --no-daemon --console=plain 2>&1 | tee ../gradle.log; exit ${PIPESTATUS[0]}
+
+      - name: Show build errors
+        if: failure()
+        run: |
+          grep -E "error:|e: |What went wrong|Could not|FAILED|Execution failed" -A3 gradle.log | head -60 | while IFS= read -r l; do echo "::error::$l"; done || true
 
       - name: Rename
         run: cp android/app/build/outputs/apk/release/app-release.apk Lobby.apk
