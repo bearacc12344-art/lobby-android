@@ -24,6 +24,9 @@ export function applyTheme() {
   const p = palette();
   const root = document.documentElement.style;
   for (const [k, v] of Object.entries(p)) root.setProperty('--' + k.replace('_', '-'), v);
+  // icon shadow: halfway between the muted text colour and the background
+  const mix = (a, b) => '#' + [1, 3, 5].map((i) => Math.round((parseInt(a.slice(i, i + 2), 16) + parseInt(b.slice(i, i + 2), 16)) / 2).toString(16).padStart(2, '0')).join('');
+  root.setProperty('--ico-sh', mix(p.muted, p.bg));
   const fonts = { comic: "'LobbyComic', 'ComicNeue'", doors: "'Doors', 'ComicNeue'", system: "system-ui, 'Roboto'" };
   root.setProperty('--font', `${fonts[S.get('font')] || fonts.comic}, 'Twemoji', 'Noto Color Emoji', sans-serif`);
   root.setProperty('--fs', S.get('font_size') + 'px');

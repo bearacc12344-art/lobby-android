@@ -1,4 +1,5 @@
 // 🧠 The Lobby Brain: the community picture brain + the language brain (port of brain.BrainView / lang.LangView)
+import { I } from '../util/icons.js';
 import { html, useBus, useEffect, useRef, useState } from './h.js';
 import { ctx } from '../ctx.js';
 import { S } from '../util/settings.js';
@@ -226,19 +227,19 @@ function VisionPage() {
       ['🙋', `${me.ex || 0} fed · ${num(me.steps)} steps`, 'by you']]} /></div>
     ${!b || !b.loaded ? html`<div class="muted small">⏳ ${tr('Loading the brain...')}</div>` : null}
     <div class="row" style=${{ margin: '8px 0' }}>
-      <button class=${'chip' + (!feeding ? ' on' : '')} onClick=${() => setFeeding(false)}>🎯 ${tr('Test it')}</button>
-      <button class=${'chip' + (feeding ? ' on' : '')} onClick=${() => setFeeding(true)}>🍎 ${tr('Feed it')}</button>
-      <span class="grow"></span><button class="btn small flat" onClick=${() => pad.current.clear()}>🗑 ${tr('Clear')}</button>
+      <button class=${'chip' + (!feeding ? ' on' : '')} onClick=${() => setFeeding(false)}>${I('🎯')} ${tr('Test it')}</button>
+      <button class=${'chip' + (feeding ? ' on' : '')} onClick=${() => setFeeding(true)}>${I('🍎')} ${tr('Feed it')}</button>
+      <span class="grow"></span><button class="btn small flat" onClick=${() => pad.current.clear()}>${I('🗑')} ${tr('Clear')}</button>
     </div>
     <div class="row" style=${{ gap: '5px', marginBottom: '8px', flexWrap: 'wrap' }}>
       ${PEN_COLORS.map((c) => html`<button onClick=${() => { setPen(c); setEraser(false); }} style=${{ width: '28px', height: '28px', borderRadius: '14px', background: c,
         border: `${!eraser && pen === c ? 3 : 2}px solid ${!eraser && pen === c ? 'var(--text)' : 'var(--border)'}` }}></button>`)}
-      <button class=${'chip' + (eraser ? ' on' : '')} onClick=${() => setEraser(true)}>🧽</button>
+      <button class=${'chip' + (eraser ? ' on' : '')} onClick=${() => setEraser(true)}>${I('🧽')}</button>
     </div>
     <${Pad} padRef=${pad} pen=${pen} eraser=${eraser} onChange=${onDraw} />
     <div class="row" style=${{ margin: '8px 0', flexWrap: 'wrap' }}>
-      <button class="btn small" onClick=${() => pick(null)}>🖼 ${tr('Picture(s)')}</button>
-      <button class="btn small" onClick=${() => pick('environment')}>📷 ${tr('Camera')}</button>
+      <button class="btn small" onClick=${() => pick(null)}>${I('🖼')} ${tr('Picture(s)')}</button>
+      <button class="btn small" onClick=${() => pick('environment')}>${I('📷')} ${tr('Camera')}</button>
     </div>
     ${job ? html`<${BrainJobCard} j=${job} />` : null}
     ${feeding ? html`<div class="row" style=${{ marginBottom: '8px' }}>
@@ -274,7 +275,7 @@ function BrainJobCard({ j }) {
     ${j.done && j.failures.length ? html`<div class="small muted">${tr("Couldn't use")}: ${j.failures.slice(0, 4).map(([n, e]) => `${n} (${e})`).join('; ')}</div>` : null}
     <div class="row" style=${{ marginTop: '6px' }}>
       ${!j.done ? html`<button class="btn small flat" onClick=${() => { j.paused = !j.paused; ctx.bus.emit('brainjob'); }}>${j.paused ? '▶ ' + tr('Resume') : '⏸ ' + tr('Pause')}</button>
-        <button class="btn small flat" onClick=${() => { j.cancelled = true; j.paused = false; }}>✖ ${tr('Cancel')}</button>`
+        <button class="btn small flat" onClick=${() => { j.cancelled = true; j.paused = false; }}>${I('✖')} ${tr('Cancel')}</button>`
         : html`<span class="grow"></span><button class="btn small flat" onClick=${() => { ctx.brainJob = null; ctx.bus.emit('brainjob'); }}>OK</button>`}
     </div></div>`;
 }
@@ -341,7 +342,7 @@ function LangPage() {
     <div class="row" style=${{ gap: '4px', margin: '8px 0', flexWrap: 'wrap' }}>${STAGES.map((s, i) => html`<span class=${'chip' + (i <= si && st.bpc !== null && st.bpc !== undefined ? ' on' : '')} style=${{ fontSize: '0.8em' }}>${tr(s)}</span>`)}</div>
     ${!lg || !lg.loaded ? html`<div class="muted small">⏳ ${tr('Loading the brain...')}</div>` : null}
     <${Card} title="🍎 Feed it">
-      <div class="row"><button class="btn primary" onClick=${feedDocs}>📄 ${tr('Feed documents')}</button><span class="small muted">PDF · DOCX · TXT · MD</span></div>
+      <div class="row"><button class="btn primary" onClick=${feedDocs}>${I('📄')} ${tr('Feed documents')}</button><span class="small muted">PDF · DOCX · TXT · MD</span></div>
       ${job ? html`<${LangJobCard} j=${job} />` : null}
       <textarea class="field" rows="4" style=${{ marginTop: '8px' }} placeholder=${tr('...or paste some text here (a story, lyrics you wrote, a wiki article)')} value=${paste} onInput=${(e) => setPaste(e.target.value)}></textarea>
       <div class="row" style=${{ marginTop: '6px' }}><span class="grow"></span><button class="btn" onClick=${teachPaste}>${tr('Teach this text ✨')}</button></div>
@@ -362,7 +363,7 @@ function LangPage() {
       <label class="check" onClick=${(e) => { e.preventDefault(); setLive(!live); }}><div class="grow">${tr('🔁 Live: write a new sample every 20 s (watch it learn)')}</div><span class=${'switch' + (live ? ' on' : '')}></span></label>
     <//>
     <${Card} title="📉 Learning curve (bits per letter — lower is smarter)"><${LineChart} pts=${(st.history || []).map((h) => [h[0], h[1]])} max=${7} invert=${true} fmt=${(v) => String(v)} empty="its learning curve shows up here once it starts reading" /><//>
-    <${Card} title="📖 Library">${(st.library || []).length ? (st.library || []).map((d) => html`<div style=${{ padding: '3px 0' }}>📄 <b>${d.doc.slice(0, 50)}</b> <span class="muted small">— ${d.name || tr('someone')} · ${num(d.chars)} chars</span></div>`)
+    <${Card} title="📖 Library">${(st.library || []).length ? (st.library || []).map((d) => html`<div style=${{ padding: '3px 0' }}>${I('📄')} <b>${d.doc.slice(0, 50)}</b> <span class="muted small">— ${d.name || tr('someone')} · ${num(d.chars)} chars</span></div>`)
       : html`<div class="muted">${tr('empty — feed it a PDF, a Word doc or some text!')}</div>`}<//>
     <${Card} title="🏆 Top trainers"><${Board} contrib=${st.contrib} score=${(c) => c.chars / 100 + c.steps} line=${(c) => `${num(c.chars)} ${tr('chars fed')} · ${num(c.steps)} ${tr('steps')}`} /><//>
   </div>`;
@@ -377,7 +378,7 @@ function LangJobCard({ j }) {
     ${j.done && j.failed.length ? html`<div class="small muted">${j.failed.slice(0, 4).map(([n, e]) => `${n} (${e})`).join('; ')}</div>` : null}
     <div class="row" style=${{ marginTop: '6px' }}>${!j.done ? html`
       <button class="btn small flat" onClick=${() => { j.paused = !j.paused; ctx.bus.emit('langjob'); }}>${j.paused ? '▶ ' + tr('Resume') : '⏸ ' + tr('Pause')}</button>
-      <button class="btn small flat" onClick=${() => { j.cancelled = true; j.paused = false; }}>✖ ${tr('Cancel')}</button>`
+      <button class="btn small flat" onClick=${() => { j.cancelled = true; j.paused = false; }}>${I('✖')} ${tr('Cancel')}</button>`
       : html`<span class="grow"></span><button class="btn small flat" onClick=${() => { ctx.lang.lastJob = null; ctx.bus.emit('langjob'); }}>OK</button>`}</div></div>`;
 }
 
@@ -390,10 +391,10 @@ export function BrainHub() {
     if (m) m.ensureLoaded();
     ctx.brainTab = tab;
   }, [tab, !!ctx.brain, !!ctx.lang]);
-  return html`<div class="topbar"><h1>🧠 ${tr('The Lobby Brain')}</h1></div>
+  return html`<div class="topbar"><h1>${I('🧠')} ${tr('The Lobby Brain')}</h1></div>
     <div class="chips" style=${{ paddingTop: 0 }}>
-      <button class=${'chip' + (tab === 0 ? ' on' : '')} onClick=${() => setTab(0)}>🖼 ${tr('Pictures')}</button>
-      <button class=${'chip' + (tab === 1 ? ' on' : '')} onClick=${() => setTab(1)}>📚 ${tr('Language')}</button>
+      <button class=${'chip' + (tab === 0 ? ' on' : '')} onClick=${() => setTab(0)}>${I('🖼')} ${tr('Pictures')}</button>
+      <button class=${'chip' + (tab === 1 ? ' on' : '')} onClick=${() => setTab(1)}>${I('📚')} ${tr('Language')}</button>
     </div>
     <div class="content">${tab === 0 ? html`<${VisionPage} />` : html`<${LangPage} />`}</div>`;
 }

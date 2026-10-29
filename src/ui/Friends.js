@@ -1,4 +1,5 @@
 import { html, useBus, useEffect, useRef, useState } from './h.js';
+import { I } from '../util/icons.js';
 import { ctx } from '../ctx.js';
 import { tr } from '../util/i18n.js';
 import { PRESENCE_LABEL, fmtAgo } from '../util/format.js';
@@ -70,7 +71,7 @@ export function Friends() {
         const pres = u.presence || 'offline';
         return html`<div class="item" key=${u.id} ...${longPress(() => friendMenu(r), () => (r.state === 'friend' ? ctx.openDm(u.id) : ctx.profile(u.id)))}>
           <${Avatar} user=${u} size=${46} />
-          <div class="grow"><div class="row" style=${{ gap: '5px' }}><b class="ellipsis">${st.name(u.id)}</b>${r.trusted ? html`<span class="emoji tiny">⭐</span>` : null}<${Badges} list=${u.badges} max=${3} /></div>
+          <div class="grow"><div class="row" style=${{ gap: '5px' }}><b class="ellipsis">${st.name(u.id)}</b>${r.trusted ? html`<span class="emoji tiny">${I('⭐')}</span>` : null}<${Badges} list=${u.badges} max=${3} /></div>
             <div class="small muted ellipsis">${r.state === 'in' ? tr('Friend request') : r.state === 'out' ? tr('Friend request sent') : r.state === 'blocked' ? tr('Blocked')
               : (pres !== 'offline' ? tr(PRESENCE_LABEL[pres]) : u.last_seen ? tr(`last seen ${fmtAgo(u.last_seen)}`) : tr('Offline')) + (u.status_msg ? ' · ' + u.status_msg : '')}
               ${u.in_call ? tr(' · 🔊 in a call') : ''}</div></div>

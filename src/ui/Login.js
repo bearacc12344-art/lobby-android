@@ -1,4 +1,5 @@
 import { html, useState } from './h.js';
+import { I } from '../util/icons.js';
 import { ctx } from '../ctx.js';
 import { S } from '../util/settings.js';
 import { tr } from '../util/i18n.js';
@@ -31,7 +32,7 @@ export function Login() {
   const key = (e) => { if (e.key === 'Enter') go(); };
   return html`<div class="screen" style=${{ overflowY: 'auto' }}>
     <div style=${{ padding: 'calc(30px + env(safe-area-inset-top)) 22px 22px', display: 'flex', flexDirection: 'column', gap: '12px', maxWidth: '460px', margin: '0 auto', width: '100%' }}>
-      <div class="center emoji" style=${{ fontSize: '62px' }}>🚪</div>
+      <div class="center emoji" style=${{ fontSize: '62px' }}>${I('🚪')}</div>
       <div class="center" style=${{ fontSize: '46px', fontWeight: 700, color: 'var(--accent)', letterSpacing: '3px' }}>LOBBY</div>
       <div class="center muted">${tr('chat · call · share  —  with ur friends')}</div>
       <div class="chips" style=${{ justifyContent: 'center', padding: '10px 0' }}>

@@ -1,4 +1,5 @@
 import { html, useBus, useState } from './h.js';
+import { I } from '../util/icons.js';
 import { ctx } from '../ctx.js';
 import { S } from '../util/settings.js';
 import { tr } from '../util/i18n.js';
@@ -55,7 +56,7 @@ export function ChatList() {
   const h = new Date().getHours();
   const greet = h >= 5 && h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : h < 23 ? 'Good evening' : 'Up late';
   return html`<div class="topbar"><h1>${tr('Chats')}</h1>
-      <button class="iconbtn" onClick=${() => ctx.profile(st.myId)}>👤</button></div>
+      <button class="iconbtn" onClick=${() => ctx.profile(st.myId)}>${I('👤')}</button></div>
     <${CallBar} />
     <div class="content">
       <div style=${{ padding: '10px 12px 4px' }}>
@@ -64,7 +65,7 @@ export function ChatList() {
       ${!q && st.me ? html`<div class="small muted" style=${{ padding: '2px 16px 4px' }}>${tr(greet)}, ${st.me.display}. ${st.synced ? '' : '⏳'}</div>` : null}
       ${archived ? html`<div class="item" style=${{ padding: '10px 16px', color: 'var(--accent)' }} onClick=${() => setArchived(false)}>${tr('⬅ Back to chats')}</div>` : null}
       <div class="list">
-        ${!archived && !q && nArch ? html`<div class="item" onClick=${() => setArchived(true)}><span class="emoji" style=${{ fontSize: '1.6em', width: '44px', textAlign: 'center' }}>🗄️</span>
+        ${!archived && !q && nArch ? html`<div class="item" onClick=${() => setArchived(true)}><span class="emoji" style=${{ fontSize: '1.6em', width: '44px', textAlign: 'center' }}>${I('🗄️')}</span>
           <span class="grow">${tr(`🗄️ Archived (${nArch})`).replace('🗄️ ', '')}</span></div>` : null}
         ${chats.map((c) => {
           const typing = st.typingNames(c.id);
@@ -74,7 +75,7 @@ export function ChatList() {
               <div class="prev ellipsis" style=${typing.length ? { color: 'var(--accent)' } : null}>
                 ${c.call ? '🔊 ' + tr('Call in progress') : typing.length ? tr(`${typing.join(', ')} typing...`) : preview(c)}</div></div>
             <div class="meta"><span class="tiny muted">${c.last ? fmtShort(c.last.created) : ''}</span>
-              <span class="row" style=${{ gap: '4px' }}>${c.my.pinned ? html`<span class="emoji tiny">📌</span>` : null}${c.my.muted ? html`<span class="emoji tiny">🔕</span>` : null}
+              <span class="row" style=${{ gap: '4px' }}>${c.my.pinned ? html`<span class="emoji tiny">${I('📌')}</span>` : null}${c.my.muted ? html`<span class="emoji tiny">${I('🔕')}</span>` : null}
               ${c.unread ? html`<span class=${'badge' + (c.mentions ? ' red' : c.my.muted ? ' grey' : '')}>${c.mentions ? '@' : c.unread}</span>` : null}</span></div>
           </div>`;
         })}
@@ -83,5 +84,5 @@ export function ChatList() {
         ${!q ? html`<div style=${{ marginTop: '14px' }}><button class="btn primary" onClick=${() => ctx.setTab('friends')}>${tr('➕ Add a friend')}</button></div>` : null}</${Empty}>` : null}
       <div style=${{ height: '90px' }}></div>
     </div>
-    <button class="fab emoji" onClick=${newMenu}>✏️</button>`;
+    <button class="fab emoji" onClick=${newMenu}>${I('✏️')}</button>`;
 }

@@ -1,4 +1,5 @@
 import { html, useBus, useEffect, useState } from './h.js';
+import { I } from '../util/icons.js';
 import { ctx } from '../ctx.js';
 import { S } from '../util/settings.js';
 import { tr, LANGS, detect, lang } from '../util/i18n.js';
@@ -87,7 +88,7 @@ function Account() {
     <div class="row wrap" style=${{ marginTop: '8px' }}>${COLOR_CHOICES.map((c) => html`<button style=${{ width: '36px', height: '36px', borderRadius: '18px', background: c,
       border: me.color === c ? '3px solid var(--text)' : '1px solid var(--border)' }} onClick=${() => ctx.api('update_profile', { color: c })}></button>`)}</div>
     <${Sec} t="Friend code" /><div class="row"><b class="grow selectable">${me.friend_code}</b>
-      <button class="btn small" onClick=${() => navigator.clipboard.writeText(me.friend_code).then(() => ctx.toast('Copied!'))}>📋</button></div>
+      <button class="btn small" onClick=${() => navigator.clipboard.writeText(me.friend_code).then(() => ctx.toast('Copied!'))}>${I('📋')}</button></div>
     <${Note} t="Share this so friends can add you even if someone else picked a similar name." />
     <${Sec} t="Account" /><${Note} t="Your account lives on your friends' and the relays' copies, not on a server. Your username + password generate your key, so they can't be changed or reset." />
     <${Check} k="remember" label="Stay logged in on this computer (stores your key on this PC)" />
@@ -151,7 +152,7 @@ function Appearance() {
     <${Sec} t="Font" /><${Select} k="font" label="Font" options=${[['comic', 'Comic Sans (default)'], ['doors', 'DOORS'], ['system', 'System font']]} />
     <${Slider} k="font_size" label="Text size" min=${12} max=${22} suffix="px" />
     <${Sec} t="Messages" /><${Select} k="message_style" label="Layout" options=${[['rows', 'Rows (Discord-ish)'], ['bubbles', 'Bubbles (WhatsApp-ish)']]} />
-    <${Check} k="compact" label="Compact spacing" /><${Check} k="show_avatars" label="Show avatars" /><${Check} k="big_emoji" label="Big emoji when a message is only emoji" />
+    <${Check} k="compact" label="Compact spacing" /><${Check} k="show_avatars" label="Show avatars" /><${Check} k="big_emoji" label="Big emoji when a message is only emoji" /><${Check} k="drawn_icons" label="Lobby's drawn icons (instead of emoji)" onChange=${() => ctx.bus.emit('nav')} />
     <${Check} k="time_24h" label="24-hour clock" /><${Check} k="show_seconds" label="Show seconds" /><${Check} k="show_edits" label="Show (edited) tag" />
     <${Check} k="show_presence_dots" label="Show online dots on avatars" /><${Check} k="animations" label="Animations" />
   </${Page}>`;
@@ -193,9 +194,9 @@ function Soundboard() {
   return html`<${Page} title="Soundboard" sub="Sounds you can blast into calls. Everyone in the call hears them.">
     ${(board.data || []).map((b) => html`<div class="row" style=${{ padding: '6px 0' }}><span class="emoji">${b.emoji}</span><span class="grow">${b.name}</span><span class="tiny muted">${tr('(built-in)')}</span></div>`)}
     ${list.map((s, i) => html`<div class="row" style=${{ padding: '6px 0' }}><span class="emoji">${s.emoji}</span><span class="grow">${s.name}</span>
-      <button class="btn small" onClick=${async () => { const n = await ctx.prompt('Name:', { value: s.name }); if (n) { const l = [...list]; l[i] = { ...s, name: n }; setList(l); S.set('sounds', l); } }}>✏️</button>
-      <button class="btn small" onClick=${async () => { const e = await ctx.prompt('Emoji for this sound:', { value: s.emoji }); if (e) { const l = [...list]; l[i] = { ...s, emoji: e }; setList(l); S.set('sounds', l); } }}>😀</button>
-      <button class="btn small" onClick=${() => { const l = list.filter((x) => x !== s); setList(l); S.set('sounds', l); }}>🗑️</button></div>`)}
+      <button class="btn small" onClick=${async () => { const n = await ctx.prompt('Name:', { value: s.name }); if (n) { const l = [...list]; l[i] = { ...s, name: n }; setList(l); S.set('sounds', l); } }}>${I('✏️')}</button>
+      <button class="btn small" onClick=${async () => { const e = await ctx.prompt('Emoji for this sound:', { value: s.emoji }); if (e) { const l = [...list]; l[i] = { ...s, emoji: e }; setList(l); S.set('sounds', l); } }}>${I('😀')}</button>
+      <button class="btn small" onClick=${() => { const l = list.filter((x) => x !== s); setList(l); S.set('sounds', l); }}>${I('🗑️')}</button></div>`)}
     <button class="btn block" style=${{ marginTop: '10px' }} onClick=${add}>${tr('➕ Add sounds...')}</button>
     <${Slider} k="sound_volume" label="Soundboard volume" min=${0} max=${100} suffix="%" />
     <${Slider} k="sound_cooldown" label="Cooldown between sounds" min=${0} max=${5} step=${0.5} suffix=" s" />
@@ -222,7 +223,7 @@ function Chat() {
     <${Sec} t="Scheduled messages" />
     ${items.length ? items.map((m) => html`<div class="row" style=${{ padding: '6px 0' }}><div class="grow"><div class="ellipsis">${m.body}</div>
       <div class="tiny muted">${new Date(m.send_at * 1000).toLocaleString()} · ${ctx.store.chats[m.chat_id] ? ctx.store.chatTitle(ctx.store.chats[m.chat_id]) : ''}</div></div>
-      <button class="btn small" onClick=${async () => { await ctx.api('cancel_scheduled', { id: m.id }); setSched(items.filter((x) => x.id !== m.id)); }}>✖</button></div>`)
+      <button class="btn small" onClick=${async () => { await ctx.api('cancel_scheduled', { id: m.id }); setSched(items.filter((x) => x.id !== m.id)); }}>${I('✖')}</button></div>`)
       : html`<${Note} t="Nothing scheduled" />`}
     <${Sec} t="Slash commands" /><${Note} t="/shrug /tableflip /unflip /lenny /disapprove /me /spoiler /silent /roll [n] /coin /8ball /nudge /poll Q | a | b /schedule /call /help" />
   </${Page}>`;
@@ -258,7 +259,7 @@ function Advanced() {
 
 function About() {
   return html`<${Page} title="About">
-    <div class="center" style=${{ margin: '20px 0' }}><div class="emoji" style=${{ fontSize: '56px' }}>🚪</div><b style=${{ fontSize: '1.8em', color: 'var(--accent)' }}>LOBBY</b>
+    <div class="center" style=${{ margin: '20px 0' }}><div class="emoji" style=${{ fontSize: '56px' }}>${I('🚪')}</div><b style=${{ fontSize: '1.8em', color: 'var(--accent)' }}>LOBBY</b>
       <div class="muted">for Android · v1.0</div></div>
     <p>${tr('Lobby — made for you and your friends.')}</p>
     <p class="small muted">${tr('Same accounts, chats, groups, calls and community brains as Lobby on PC. Peer-to-peer over Nostr relays, end-to-end encrypted, calls go directly between devices (WebRTC).')}</p>
@@ -304,7 +305,7 @@ function AdminPage() {
     <button class="btn primary block" style=${{ marginTop: '8px' }} onClick=${async () => { await ctx.api('badge_make', { name, emoji, color, desc }); setName(''); setDesc(''); reload(); ctx.toast('Badge created', 'ok'); }}>${tr('Create badge')}</button>
     <${Sec} t="All badges" />
     ${st.catalog.map((b) => html`<div class="row" style=${{ padding: '4px 0' }}><span class="bchip" style=${{ background: b.color, color: b.fg }}><span class="emoji">${b.emoji}</span> ${tr(b.name)}</span>
-      <span class="grow tiny muted">${tr(b.desc)}</span>${b.custom ? html`<button class="btn small" onClick=${async () => { if (await ctx.confirm('Delete this badge?', { danger: true })) { await ctx.api('badge_delete', { badge: b.id }); reload(); } }}>🗑️</button>` : null}</div>`)}
+      <span class="grow tiny muted">${tr(b.desc)}</span>${b.custom ? html`<button class="btn small" onClick=${async () => { if (await ctx.confirm('Delete this badge?', { danger: true })) { await ctx.api('badge_delete', { badge: b.id }); reload(); } }}>${I('🗑️')}</button>` : null}</div>`)}
   </${Page}>`;
 }
 

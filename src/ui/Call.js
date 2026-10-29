@@ -1,4 +1,5 @@
 import { html, useBus, useEffect, useRef, useState } from './h.js';
+import { I } from '../util/icons.js';
 import { ctx } from '../ctx.js';
 import { S } from '../util/settings.js';
 import { tr } from '../util/i18n.js';
@@ -16,9 +17,9 @@ export function CallBar({ chatId }) {
   if (chatId && s.chatId !== chatId && false) return null;
   const c = ctx.store.chats[s.chatId];
   return html`<div class="callbar" onClick=${() => { ctx.callFull = true; ctx.bus.emit('callstate'); }}>
-    <span class="emoji">🔊</span><span class="grow ellipsis">${tr('🔊 Voice connected').replace('🔊 ', '')} · ${c ? ctx.store.chatTitle(c) : ''}</span>
-    <button class="iconbtn" onClick=${(e) => { e.stopPropagation(); s.setMuted(!s.muted); }}>${s.muted ? '🔇' : '🎙️'}</button>
-    <button class="iconbtn red" onClick=${(e) => { e.stopPropagation(); ctx.leaveCall(); }}>📞</button></div>`;
+    <span class="emoji">${I('🔊')}</span><span class="grow ellipsis">${tr('🔊 Voice connected').replace('🔊 ', '')} · ${c ? ctx.store.chatTitle(c) : ''}</span>
+    <button class="iconbtn" onClick=${(e) => { e.stopPropagation(); s.setMuted(!s.muted); }}>${I(s.muted ? '🔇' : '🎙️')}</button>
+    <button class="iconbtn red" onClick=${(e) => { e.stopPropagation(); ctx.leaveCall(); }}>${I('📞')}</button></div>`;
 }
 
 function Incoming({ r }) {
@@ -33,12 +34,12 @@ function Incoming({ r }) {
     ${c && c.kind === 'group' ? html`<${ChatAvatar} chat=${c} size=${110} />` : html`<${Avatar} user=${u} size=${110} presence=${false} />`}
     <b style=${{ fontSize: '1.6em' }}>${st.name(r.from)}</b>
     ${c && c.kind === 'group' ? html`<div>${st.chatTitle(c)}</div>` : null}
-    ${r.silent ? html`<div class="small" style=${{ opacity: 0.7 }}>🔕 ${tr('Do not disturb')}</div>` : null}
+    ${r.silent ? html`<div class="small" style=${{ opacity: 0.7 }}>${I('🔕')} ${tr('Do not disturb')}</div>` : null}
     <div class="btns">
-      <div class="col" style=${{ alignItems: 'center' }}><button class="iconbtn red" onClick=${() => decline()}>📞</button><span class="small">${tr('Decline')}</span></div>
-      <div class="col" style=${{ alignItems: 'center' }}><button class="iconbtn" style=${{ background: '#444' }} onClick=${msg}>💬</button><span class="small">${tr('Message')}</span></div>
-      <div class="col" style=${{ alignItems: 'center' }}><button class="iconbtn" style=${{ background: '#444' }} onClick=${() => ctx.joinCall(r.call.id, { muted: true })}>🔇</button><span class="small">${tr('Join muted')}</span></div>
-      <div class="col" style=${{ alignItems: 'center' }}><button class="iconbtn green pulse" onClick=${() => ctx.joinCall(r.call.id, { video: r.video })}>📞</button><span class="small">${tr('Accept')}</span></div>
+      <div class="col" style=${{ alignItems: 'center' }}><button class="iconbtn red" onClick=${() => decline()}>${I('📞')}</button><span class="small">${tr('Decline')}</span></div>
+      <div class="col" style=${{ alignItems: 'center' }}><button class="iconbtn" style=${{ background: '#444' }} onClick=${msg}>${I('💬')}</button><span class="small">${tr('Message')}</span></div>
+      <div class="col" style=${{ alignItems: 'center' }}><button class="iconbtn" style=${{ background: '#444' }} onClick=${() => ctx.joinCall(r.call.id, { muted: true })}>${I('🔇')}</button><span class="small">${tr('Join muted')}</span></div>
+      <div class="col" style=${{ alignItems: 'center' }}><button class="iconbtn green pulse" onClick=${() => ctx.joinCall(r.call.id, { video: r.video })}>${I('📞')}</button><span class="small">${tr('Accept')}</span></div>
     </div></div>`;
 }
 
@@ -65,7 +66,7 @@ function Tile({ uid, kind, focus, onTap }) {
   const lvl = (s.audio.levels[me ? 0 : uid] || 0) > 0.02;
   return html`<div class=${'tile' + (lvl ? ' speaking' : '') + (focus ? ' focus' : '')} onClick=${onTap}>
     ${kind ? (me && kind === 2 ? html`<video ref=${vid} autoplay muted playsinline style=${{ transform: S.get('mirror') && s.cam && s.cam.facing === 'user' ? 'scaleX(-1)' : 'none' }}></video>`
-      : me && kind === 3 ? html`<div class="col" style=${{ alignItems: 'center' }}><span class="emoji" style=${{ fontSize: '3em' }}>🖥️</span><span class="small">${tr('You are sharing your screen')}</span></div>`
+      : me && kind === 3 ? html`<div class="col" style=${{ alignItems: 'center' }}><span class="emoji" style=${{ fontSize: '3em' }}>${I('🖥️')}</span><span class="small">${tr('You are sharing your screen')}</span></div>`
         : html`<canvas ref=${cv}></canvas>`)
       : html`<${Avatar} user=${u} size=${focus ? 120 : 76} presence=${false} />`}
     <div class="label">${m.muted || m.deaf ? '🔇 ' : ''}${kind === 3 ? '🖥️ ' : ''}${me ? tr('You') : ctx.store.name(uid)}${s.localMuted.has(uid) ? ' 🙉' : ''}</div></div>`;
@@ -119,7 +120,7 @@ function CallScreen() {
   const dur = fmtDur(Date.now() / 1000 - s.started);
   return html`<div class="callscreen">
     <div class="row" style=${{ padding: 'calc(8px + env(safe-area-inset-top)) 10px 0', color: '#fff' }}>
-      <button class="iconbtn" style=${{ color: '#fff' }} onClick=${() => { ctx.callFull = false; ctx.bus.emit('callstate'); }}>⬇️</button>
+      <button class="iconbtn" style=${{ color: '#fff' }} onClick=${() => { ctx.callFull = false; ctx.bus.emit('callstate'); }}>${I('⬇️')}</button>
       <div class="grow"><b>${c ? st.chatTitle(c) : ''}</b><div class="small" style=${{ opacity: 0.7 }}>${dur}${s.ringing.size ? tr('  ·  🔔 ringing ') : ''}
         ${ctx.net.bytes ? ` · ↑${Math.round(ctx.net.bytes.up / 1024)}K ↓${Math.round(ctx.net.bytes.down / 1024)}K` : ''}</div></div></div>
     <div class="tiles" style=${{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}>
@@ -127,13 +128,13 @@ function CallScreen() {
         onTap=${() => setFocus(focus ? null : `${uid}:${kind}`)} />`)}</div>
     ${floats.map((f) => html`<div class="floating" key=${f.id} style=${{ left: f.x + '%', bottom: '120px' }}>${f.emoji}${f.sound ? html`<div class="tiny" style=${{ fontFamily: 'var(--font)' }}>${st.name(f.from)}: ${f.sound}</div>` : null}</div>`)}
     <div class="callctl">
-      <button class=${'iconbtn' + (s.muted ? ' on' : '')} onClick=${() => s.setMuted(!s.muted)}>${s.muted ? '🔇' : '🎙️'}</button>
-      <button class=${'iconbtn' + (s.cam ? ' on' : '')} onClick=${() => (s.cam ? s.stopCam() : s.startCam())}>📷</button>
-      <button class=${'iconbtn' + (s.screen ? ' on' : '')} onClick=${() => (s.screen ? s.stopScreen() : s.startScreen())}>🖥️</button>
-      <button class="iconbtn" onClick=${reactions}>😀</button>
-      <button class="iconbtn" onClick=${soundboard}>🔊</button>
+      <button class=${'iconbtn' + (s.muted ? ' on' : '')} onClick=${() => s.setMuted(!s.muted)}>${I(s.muted ? '🔇' : '🎙️')}</button>
+      <button class=${'iconbtn' + (s.cam ? ' on' : '')} onClick=${() => (s.cam ? s.stopCam() : s.startCam())}>${I('📷')}</button>
+      <button class=${'iconbtn' + (s.screen ? ' on' : '')} onClick=${() => (s.screen ? s.stopScreen() : s.startScreen())}>${I('🖥️')}</button>
+      <button class="iconbtn" onClick=${reactions}>${I('😀')}</button>
+      <button class="iconbtn" onClick=${soundboard}>${I('🔊')}</button>
       <button class="iconbtn" onClick=${more}>⋯</button>
-      <button class="iconbtn red" onClick=${leave}>📞</button>
+      <button class="iconbtn red" onClick=${leave}>${I('📞', 'red')}</button>
     </div></div>`;
 }
 

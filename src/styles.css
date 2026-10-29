@@ -227,3 +227,15 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
 /* ---------- badges */
 .bchip { display: inline-flex; align-items: center; gap: 3px; border-radius: 10px; padding: 1px 7px; font-size: 0.75em; font-weight: 700; }
 .bchips { display: inline-flex; gap: 3px; flex-wrap: wrap; vertical-align: middle; }
+
+/* ---------- drawn icons (util/icons.js) */
+.ico { width: 1.3em; height: 1.3em; vertical-align: -0.28em; display: inline-block; flex: none; overflow: visible; }
+.ico .f { fill: var(--text); }
+.ico .s { fill: var(--ico-sh, #555); }
+.iconbtn .ico { width: 1.45em; height: 1.45em; vertical-align: middle; }
+.bottomnav .ic .ico { width: 1.6em; height: 1.6em; }
+.bottomnav button.on .ico .f { fill: var(--accent); }
+.btn.primary .ico .f, .chip.on .ico .f, .iconbtn.on .ico .f { fill: var(--accent-text); }
+.iconbtn.red .ico .f, .iconbtn.green .ico .f { fill: #ffffff; }
+.iconbtn.red .ico .s, .iconbtn.green .ico .s { fill: rgba(0,0,0,0.35); }
+.mi .ic .ico { width: 1.35em; height: 1.35em; }

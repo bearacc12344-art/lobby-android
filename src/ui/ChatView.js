@@ -1,4 +1,5 @@
 import { html, useBus, useEffect, useRef, useState, useForce } from './h.js';
+import { I } from '../util/icons.js';
 import { ctx } from '../ctx.js';
 import { S } from '../util/settings.js';
 import { tr } from '../util/i18n.js';
@@ -31,7 +32,7 @@ function ImageAtt({ m }) {
   const [url, err, load] = useFileUrl(m.file.id, S.get('auto_download_images'));
   const gif = ['gif', 'webp'].includes(extOf(m.file.name));
   if (err) return html`<div class="muted small">${tr("⚠️ couldn't load image")}</div>`;
-  if (!url) return html`<div class="filecard" onClick=${load}><span class="ic">🖼️</span><div class="grow small">${S.get('auto_download_images') ? tr('🖼️ loading image...') : tr(`🖼️ ${m.file.name} · ${fmtSize(m.file.size)} — click to load`)}</div></div>`;
+  if (!url) return html`<div class="filecard" onClick=${load}><span class="ic">${I('🖼️')}</span><div class="grow small">${S.get('auto_download_images') ? tr('🖼️ loading image...') : tr(`🖼️ ${m.file.name} · ${fmtSize(m.file.size)} — click to load`)}</div></div>`;
   return html`<div class="attach"><img src=${url} loading="lazy" style=${gif && !S.get('autoplay_gifs') ? { filter: 'grayscale(0.2)' } : null}
     onClick=${() => ctx.sheet({ kind: 'image', url, name: m.file.name, fid: m.file.id })} /></div>`;
 }
@@ -78,7 +79,7 @@ function AudioAtt({ m }) {
     const r = e.currentTarget.getBoundingClientRect();
     a.current.currentTime = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * st.d;
   };
-  return html`<div class="audiocard"><button class="iconbtn" onClick=${toggle}>${st.playing ? '⏸️' : '▶️'}</button>
+  return html`<div class="audiocard"><button class="iconbtn" onClick=${toggle}>${I(st.playing ? '⏸️' : '▶️')}</button>
     <div class="grow"><div class="bar" onClick=${seek}><i style=${{ width: (st.d ? (st.t / st.d) * 100 : 0) + '%' }}></i></div>
     <div class="tiny muted" style=${{ marginTop: '4px' }}>${m.kind === 'voice' ? '🎤 ' + tr('Voice message') : m.file.name} · ${st.d ? fmtDur(st.t) + ' / ' + fmtDur(st.d) : fmtSize(m.file.size)}</div></div></div>`;
 }
@@ -93,9 +94,9 @@ function FileAtt({ m }) {
     } catch (e) { ctx.toast(e.message || String(e), 'error'); }
     setBusy(false);
   }
-  return html`<div class="filecard" onClick=${() => get(true)}><span class="ic">📎</span><div class="grow"><div class="ellipsis">${m.file.name}</div>
+  return html`<div class="filecard" onClick=${() => get(true)}><span class="ic">${I('📎')}</span><div class="grow"><div class="ellipsis">${m.file.name}</div>
     <div class="tiny muted">${fmtSize(m.file.size)}${busy ? ' · ⏳' : ''}</div></div>
-    <button class="iconbtn" onClick=${(e) => { e.stopPropagation(); get(false); }}>⬇️</button></div>`;
+    <button class="iconbtn" onClick=${(e) => { e.stopPropagation(); get(false); }}>${I('⬇️')}</button></div>`;
 }
 
 function Attachment({ m }) {
@@ -112,7 +113,7 @@ function Poll({ m }) {
   if (!p) return null;
   const total = new Set(Object.values(p.votes).flat()).size || 0;
   const me = ctx.store.myId;
-  return html`<div class="poll"><div>📊 <b>${m.body || tr('Poll')}</b> <span class="tiny muted">${p.multi ? tr('multiple choice') : ''}</span></div>
+  return html`<div class="poll"><div>${I('📊')} <b>${m.body || tr('Poll')}</b> <span class="tiny muted">${p.multi ? tr('multiple choice') : ''}</span></div>
     ${p.options.map((o, i) => {
       const v = p.votes[i] || [];
       const pct = total ? Math.round((v.length / total) * 100) : 0;
@@ -143,7 +144,7 @@ function Message({ m, prev, chat, onMenu, highlight, isLast }) {
   const big = !m.deleted && S.get('big_emoji') && !m.file && isEmojiOnly(m.body);
   const reacts = Object.entries(m.reactions || {});
   let body;
-  if (m.deleted) body = html`<div class="body muted"><i>🚫 ${tr('This message was deleted')}</i></div>`;
+  if (m.deleted) body = html`<div class="body muted"><i>${I('🚫')} ${tr('This message was deleted')}</i></div>`;
   else if (m.kind === 'poll') body = html`<${Poll} m=${m} />`;
   else {
     body = html`${m.file ? html`<${Attachment} m=${m} />` : null}
@@ -340,21 +341,21 @@ function Composer({ chat, reply, setReply, edit, setEdit, onSent }) {
 
   return html`<div class="composer">
     ${sugg.length ? html`<div class="suggest">${sugg.map((s) => html`<div onClick=${() => pick(s)}>${s.label}</div>`)}</div>` : null}
-    ${reply ? html`<div class="ctx"><span class="emoji">↩️</span><span class="grow ellipsis">${tr('Reply')} · <b>${st.name(reply.sender)}</b>: ${reply.body || (reply.file || {}).name || ''}</span>
-      <button class="iconbtn" onClick=${() => setReply(null)}>✖️</button></div>` : null}
-    ${edit ? html`<div class="ctx"><span class="emoji">✏️</span><span class="grow">${tr('✏️ Editing message  ·  Esc to cancel').replace('✏️ ', '').split('·')[0]}</span>
-      <button class="iconbtn" onClick=${() => { setEdit(null); setText(''); }}>✖️</button></div>` : null}
-    ${silent ? html`<div class="ctx">🤫 ${tr('Silent: send without notifying')}</div>` : null}
+    ${reply ? html`<div class="ctx"><span class="emoji">${I('↩️')}</span><span class="grow ellipsis">${tr('Reply')} · <b>${st.name(reply.sender)}</b>: ${reply.body || (reply.file || {}).name || ''}</span>
+      <button class="iconbtn" onClick=${() => setReply(null)}>${I('✖️')}</button></div>` : null}
+    ${edit ? html`<div class="ctx"><span class="emoji">${I('✏️')}</span><span class="grow">${tr('✏️ Editing message  ·  Esc to cancel').replace('✏️ ', '').split('·')[0]}</span>
+      <button class="iconbtn" onClick=${() => { setEdit(null); setText(''); }}>${I('✖️')}</button></div>` : null}
+    ${silent ? html`<div class="ctx">${I('🤫')} ${tr('Silent: send without notifying')}</div>` : null}
     <div class="bar">
       ${rec ? html`<div class="rec"><span class="dot"></span>${fmtDur(recT)} · ${tr('🎙 Recording... click again to send').replace('🎙 ', '')}</div>
-          <button class="iconbtn" onClick=${micCancel}>🗑️</button><button class="iconbtn send" onClick=${micSend}>➤</button>`
-        : html`<button class="iconbtn" onClick=${attach}>➕</button>
-          <button class="iconbtn" onClick=${() => ctx.sheet({ kind: 'emoji', onPick: (e) => setText((t) => t + e) })}>😀</button>
+          <button class="iconbtn" onClick=${micCancel}>${I('🗑️')}</button><button class="iconbtn send" onClick=${micSend}>${I('➤')}</button>`
+        : html`<button class="iconbtn" onClick=${attach}>${I('➕')}</button>
+          <button class="iconbtn" onClick=${() => ctx.sheet({ kind: 'emoji', onPick: (e) => setText((t) => t + e) })}>${I('😀')}</button>
           <textarea ref=${ta} rows="1" placeholder=${tr('Message...')} value=${text} onInput=${onInput}
             onKeyDown=${(e) => { if (e.key === 'Enter' && !e.shiftKey && S.get('enter_to_send')) { e.preventDefault(); send(); } if (e.key === 'Escape' && edit) { setEdit(null); setText(''); } }}></textarea>
-          ${text.trim() ? html`<button class="iconbtn send" onClick=${send}>➤</button>`
+          ${text.trim() ? html`<button class="iconbtn send" onClick=${send}>${I('➤')}</button>`
             : html`<button class="iconbtn" onClick=${() => ctx.sheet({ kind: 'gif', onPick: (f) => sendFiles([f]) })} style=${{ fontSize: '0.85em', fontWeight: 700 }}>GIF</button>
-              <button class="iconbtn" onClick=${micDown}>🎙️</button>`}`}
+              <button class="iconbtn" onClick=${micDown}>${I('🎙️')}</button>`}`}
     </div></div>`;
 }
 
@@ -477,7 +478,7 @@ export function ChatView({ cid, jump }) {
     ctx.menu([{ label: 'In 20 minutes', fn: at(20) }, { label: 'In 1 hour', fn: at(60) }, { label: 'In 3 hours', fn: at(180) }, { label: 'Tomorrow', fn: () => at(tomorrow())() }], tr('⏰  Remind me').trim());
   }
 
-  if (!chat) return html`<div class="screen"><div class="topbar"><button class="iconbtn" onClick=${() => ctx.pop()}>⬅️</button></div></div>`;
+  if (!chat) return html`<div class="screen"><div class="topbar"><button class="iconbtn" onClick=${() => ctx.pop()}>${I('⬅️')}</button></div></div>`;
   const title = st.chatTitle(chat);
   let sub = '';
   const typing = st.typingNames(cid);
@@ -525,18 +526,18 @@ export function ChatView({ cid, jump }) {
   const call = chat.call;
   return html`<div class=${'screen' + (shake ? ' shake' : '')}>
     <div class="topbar">
-      <button class="iconbtn" onClick=${() => ctx.pop()}>⬅️</button>
+      <button class="iconbtn" onClick=${() => ctx.pop()}>${I('⬅️')}</button>
       <div onClick=${() => (chat.kind === 'group' ? ctx.sheet({ kind: 'group', cid }) : ctx.profile(other))}><${ChatAvatar} chat=${chat} size=${38} /></div>
       <div class="title" onClick=${() => (chat.kind === 'group' ? ctx.sheet({ kind: 'group', cid }) : ctx.profile(other))}>
         <b>${title} ${chat.kind === 'dm' && other !== st.myId ? html`<${Badges} list=${(st.users[other] || {}).badges} max=${3} />` : null}</b>
         <div class="small ellipsis" style=${{ color: typing.length ? 'var(--accent)' : 'var(--muted)' }}>${sub}</div></div>
-      ${other !== st.myId ? html`<button class="iconbtn" onClick=${() => ctx.startCall(cid, false)}>📞</button>
-        <button class="iconbtn" onClick=${() => ctx.startCall(cid, true)}>📹</button>` : null}
+      ${other !== st.myId ? html`<button class="iconbtn" onClick=${() => ctx.startCall(cid, false)}>${I('📞')}</button>
+        <button class="iconbtn" onClick=${() => ctx.startCall(cid, true)}>${I('📹')}</button>` : null}
       <button class="iconbtn" onClick=${menu}>⋮</button>
     </div>
     ${search ? html`<${SearchBar} cid=${cid} s=${search} set=${setSearch} onPick=${(mid) => { setSearch(null); jumpTo(mid); }} />` : null}
     <${CallBar} chatId=${cid} />
-    ${call && (!ctx.call || ctx.call.callId !== call.id) ? html`<div class="callbar" onClick=${() => ctx.joinCall(call.id)}>🔊 ${tr('Call in progress')} · ${tr(`${call.members.length} in call`)}
+    ${call && (!ctx.call || ctx.call.callId !== call.id) ? html`<div class="callbar" onClick=${() => ctx.joinCall(call.id)}>${I('🔊')} ${tr('Call in progress')} · ${tr(`${call.members.length} in call`)}
       <span class="spacer"></span><b>${tr('Join call')}</b></div>` : null}
     ${pins.length ? html`<div class="card" style=${{ margin: '6px 8px 0', padding: '6px 12px' }} onClick=${() => ctx.sheet({ kind: 'pins', cid })}>
       <span class="small">${tr(`📌  ${pins.length} pinned message${pins.length > 1 ? 's' : ''} — click to see`)}</span></div>` : null}
@@ -560,7 +561,7 @@ function SearchBar({ cid, s, set, onPick }) {
   return html`<div style=${{ background: 'var(--panel)', borderBottom: '1px solid var(--border)', maxHeight: '45%', overflowY: 'auto' }}>
     <div class="row" style=${{ padding: '6px 8px' }}><input class="field" autofocus placeholder=${tr('Search messages in this chat... (Enter)')} value=${s.q}
       onInput=${(e) => set({ ...s, q: e.target.value })} onKeyDown=${(e) => e.key === 'Enter' && run(e.target.value)} />
-      <button class="iconbtn" onClick=${() => set(null)}>✖️</button></div>
+      <button class="iconbtn" onClick=${() => set(null)}>${I('✖️')}</button></div>
     ${s.res ? (s.res.length ? s.res.map((m) => html`<div class="pad" style=${{ borderTop: '1px solid var(--border)' }} onClick=${() => onPick(m.id)}>
       <div class="small"><b>${st.name(m.sender)}</b> <span class="muted">${dayLabel(m.created)} ${fmtTime(m.created)}</span></div>
       <div class="ellipsis">${m.body || (m.file || {}).name}</div></div>`) : html`<div class="pad muted">${tr('No results 👀')}</div>`) : null}

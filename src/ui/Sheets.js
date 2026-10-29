@@ -1,4 +1,5 @@
 import { html, useBus, useEffect, useRef, useState } from './h.js';
+import { I } from '../util/icons.js';
 import { ctx } from '../ctx.js';
 import { S } from '../util/settings.js';
 import { tr } from '../util/i18n.js';
@@ -13,7 +14,7 @@ function Menu({ s }) {
     ${s.items.filter(Boolean).map((it) => it.row ? html`<div class="row" style=${{ justifyContent: 'space-between', padding: '4px 2px 10px' }}>
         ${it.row.map((e) => html`<button class="iconbtn" style=${{ fontSize: '1.6em' }} onClick=${() => { ctx.closeSheet(s); it.fn(e); }}>${e}</button>`)}</div>`
       : html`<div class=${'mi' + (it.danger ? ' danger' : '')} onClick=${() => { ctx.closeSheet(s); it.fn && it.fn(); }}>
-        <span class="ic">${it.ic || ''}</span><span class="grow">${tr(it.label)}</span>${it.right || ''}</div>`)}</div>`;
+        <span class="ic">${I(it.ic || '')}</span><span class="grow">${tr(it.label)}</span>${it.right || ''}</div>`)}</div>`;
 }
 
 function Confirm({ s }) {
@@ -45,7 +46,7 @@ function EmojiSheet({ s }) {
   const shown = q ? all.filter((e) => (EMOJI_NAMES[e] || '').includes(q.toLowerCase())) : null;
   return html`<div style=${{ display: 'flex', flexDirection: 'column', height: '100%' }}>
     <div class="row" style=${{ padding: '10px 12px 4px' }}><input class="field" placeholder=${tr('Search  (try skull, fire, door...)')} value=${q} onInput=${(e) => setQ(e.target.value)} />
-      <button class="iconbtn" onClick=${() => ctx.closeSheet(s)}>✖️</button></div>
+      <button class="iconbtn" onClick=${() => ctx.closeSheet(s)}>${I('✖️')}</button></div>
     <div style=${{ overflowY: 'auto', flex: 1 }}>
       ${shown ? html`<div class="egrid">${shown.map((e) => html`<button onClick=${() => pick(e)}>${e}</button>`)}</div>` : html`
         ${recent.length ? html`<div class="section" style=${{ margin: '8px 12px 0' }}>${tr('Recent')}</div><div class="egrid">${recent.map((e) => html`<button onClick=${() => pick(e)}>${e}</button>`)}</div>` : null}
@@ -57,8 +58,8 @@ function EmojiSheet({ s }) {
 function ImageViewer({ s }) {
   return html`<div style=${{ position: 'fixed', inset: 0, background: '#000', display: 'flex', flexDirection: 'column', zIndex: 70 }}>
     <div class="row" style=${{ padding: 'calc(8px + env(safe-area-inset-top)) 8px 8px', color: '#fff' }}>
-      <button class="iconbtn" style=${{ color: '#fff' }} onClick=${() => ctx.closeSheet(s)}>⬅️</button><span class="grow ellipsis">${s.name}</span>
-      ${s.fid ? html`<button class="iconbtn" onClick=${async () => { const f = await getFile(s.fid); saveFile(f.name, f.bytes); }}>💾</button>` : null}</div>
+      <button class="iconbtn" style=${{ color: '#fff' }} onClick=${() => ctx.closeSheet(s)}>${I('⬅️')}</button><span class="grow ellipsis">${s.name}</span>
+      ${s.fid ? html`<button class="iconbtn" onClick=${async () => { const f = await getFile(s.fid); saveFile(f.name, f.bytes); }}>${I('💾')}</button>` : null}</div>
     <div style=${{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'auto' }}>
       <img src=${s.url} style=${{ maxWidth: '100%', maxHeight: '100%', touchAction: 'pinch-zoom' }} /></div></div>`;
 }
@@ -87,10 +88,10 @@ export function ProfileSheet({ s }) {
     ${mutual.length ? html`<div class="small muted">${tr('Mutual groups:')} ${mutual.map((c) => c.name).join(', ')}</div>` : null}
     ${me ? html`<div class="row wrap" style=${{ justifyContent: 'center' }}>
         <button class="btn" onClick=${() => { ctx.closeSheet(s); ctx.setTab('settings'); ctx.push({ kind: 'settings', page: 'account' }); }}>${tr('Edit my profile')}</button>
-        <button class="btn" onClick=${() => { ctx.closeSheet(s); ctx.openDm(uid); }}>📝 ${tr('Notes to self')}</button></div>`
+        <button class="btn" onClick=${() => { ctx.closeSheet(s); ctx.openDm(uid); }}>${I('📝')} ${tr('Notes to self')}</button></div>`
       : html`<div class="row wrap" style=${{ justifyContent: 'center' }}>
         ${r && r.state === 'friend' ? html`<button class="btn primary" onClick=${() => { ctx.closeSheet(s); ctx.openDm(uid); }}>${tr('💬 Message')}</button>
-          <button class="btn" onClick=${async () => { ctx.closeSheet(s); const c = st.dmWith(uid) || await ctx.api('open_dm', { user_id: uid }); ctx.startCall(c.id); }}>📞 ${tr('Call')}</button>` : null}
+          <button class="btn" onClick=${async () => { ctx.closeSheet(s); const c = st.dmWith(uid) || await ctx.api('open_dm', { user_id: uid }); ctx.startCall(c.id); }}>${I('📞')} ${tr('Call')}</button>` : null}
         ${r && r.state === 'in' ? html`<button class="btn primary" onClick=${() => act('friend_respond', { accept: true })}>${tr('✔ Accept friend request')}</button>
           <button class="btn" onClick=${() => act('friend_respond', { accept: false })}>${tr('✖ Ignore')}</button>` : null}
         ${r && r.state === 'out' ? html`<span class="muted">${tr('Friend request sent')}</span>` : null}
@@ -122,7 +123,7 @@ function AdminBadgeButton({ uid, sheet }) {
     const reload = async () => { st = await ctx.api('badge_state'); ctx.bus.emit('nav'); };
     ctx.sheet({ kind: 'custom', render: (s) => html`<${GrantSheet} s=${s} uid=${uid} st=${st} reload=${reload} />` });
   };
-  return html`<button class="btn small" onClick=${open}>🏅 ${tr('Badges')}</button>`;
+  return html`<button class="btn small" onClick=${open}>${I('🏅')} ${tr('Badges')}</button>`;
 }
 
 function GroupSheet({ s }) {
@@ -265,7 +266,7 @@ function MediaSheet({ s }) {
     ${list === null ? html`<div class="empty">⏳</div>` : tab === 'img'
       ? html`<div style=${{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '4px' }}>${imgs.map((m) => html`<${MediaThumb} m=${m} onOpen=${(url) => ctx.sheet({ kind: 'image', url, name: m.file.name, fid: m.file.id })} />`)}</div>`
       : files.map((m) => html`<div class="row" style=${{ padding: '8px 0' }} onClick=${async () => { const f = await getFile(m.file.id); saveFile(f.name, f.bytes); }}>
-          <span class="emoji">${m.kind === 'voice' ? '🎤' : '📎'}</span><span class="grow ellipsis">${m.file.name}</span><span class="tiny muted">${fmtSize(m.file.size)}</span></div>`)}</div>`;
+          <span class="emoji">${I(m.kind === 'voice' ? '🎤' : '📎')}</span><span class="grow ellipsis">${m.file.name}</span><span class="tiny muted">${fmtSize(m.file.size)}</span></div>`)}</div>`;
 }
 
 const FULL = new Set(['emoji', 'gif']);

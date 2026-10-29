@@ -1,4 +1,5 @@
 import { html, useEffect, useRef, useState } from './h.js';
+import { I } from '../util/icons.js';
 import { ctx } from '../ctx.js';
 import { tr } from '../util/i18n.js';
 import { search, downloadGif, myGifs, saveMyGif, removeMyGif, touchMyGif } from '../gifs.js';
@@ -42,7 +43,7 @@ export function GifPicker({ s }) {
       <button class=${'chip' + (tab === 'mine' ? ' on' : '')} onClick=${() => setTab('mine')}>${tr('⭐ My GIFs')}</button>
       <span class="spacer"></span>
       ${tab === 'mine' ? html`<button class="btn small" onClick=${async () => { for (const f of await pickFiles({ accept: 'image/gif,image/webp' })) await saveMyGif(f.name, await readFile(f)); loadMine(); }}>${tr('➕ Add GIF files')}</button>` : null}
-      <button class="iconbtn" onClick=${() => ctx.closeSheet(s)}>✖️</button></div>
+      <button class="iconbtn" onClick=${() => ctx.closeSheet(s)}>${I('✖️')}</button></div>
     ${tab === 'search' ? html`<div style=${{ padding: '8px 10px 0' }}><input class="field" placeholder=${tr('Search GIFs...')} value=${q}
       onInput=${(e) => { setQ(e.target.value); clearTimeout(deb.current); const v = e.target.value; deb.current = setTimeout(() => run(v), 450); }} /></div>` : null}
     ${status ? html`<div class="small muted" style=${{ padding: '6px 12px' }}>${status}</div>` : null}

@@ -1,4 +1,5 @@
 import { html, useBus, useEffect, useState } from './h.js';
+import { I } from '../util/icons.js';
 import { ctx } from '../ctx.js';
 import { tr } from '../util/i18n.js';
 import { ChatList } from './ChatList.js';
@@ -35,7 +36,7 @@ export function Main() {
       ${ctx.stack.map((s, i) => html`<div class="screen pushed" key=${i + ':' + s.kind} style=${{ display: i === ctx.stack.length - 1 ? 'flex' : 'none' }}><${Screen} s=${s} /></div>`)}
     </div>
     ${top ? null : html`<nav class="bottomnav">${TABS.map(([k, ic, label]) => html`<button class=${ctx.tab === k ? 'on' : ''} onClick=${() => ctx.setTab(k)}>
-      <span class="ic">${ic}</span><span>${tr(label)}</span>
+      <span class="ic">${I(ic)}</span><span>${tr(label)}</span>
       ${k === 'chats' && unread ? html`<i class="navbadge">${unread > 99 ? '99+' : unread}</i>` : null}
       ${k === 'friends' && pending ? html`<i class="navbadge">${pending}</i>` : null}
     </button>`)}</nav>`}

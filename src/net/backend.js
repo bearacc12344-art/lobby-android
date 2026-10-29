@@ -1,6 +1,6 @@
 // Lobby P2P backend - a faithful JavaScript port of p2p.py's Backend, so phones and PCs share the same chats,
 // friends, groups, calls and community brains. No server: Nostr relays carry signed, end-to-end encrypted events.
-import { Keys, enc, dec, encBytes, decBytes, encPart, decPart, b64, unb64, hex, randBytes, sha256hex, te } from './crypto.js';
+import { Keys, enc, dec, encBytes, decBytes, encPart, decPart, b64, unb64, hex, unhex, randBytes, sha256hex, te } from './crypto.js';
 import { RelayPool } from './relay.js';
 import { LocalDB } from './db.js';
 import { idb } from './idb.js';
@@ -1566,6 +1566,8 @@ export class Backend {
       const st = {};
       for (const k of ['muted', 'deaf', 'cam', 'screen']) st[k] = !!(pl.st || {})[k];
       st.seen = now();
+      const links = (pl.st || {}).links;
+      st.links = Array.isArray(links) ? links.slice(0, 32).map((x) => String(x).slice(0, 16)) : [];
       c.parts.set(author, st);
       c.ever.add(author);
       c.ringing.delete(author);
@@ -1616,7 +1618,8 @@ export class Backend {
       for (const [u, st] of [...c.parts]) if (t - (st.seen || t) > 12) { c.parts.delete(u); changed = true; this.closePeer(u); }
       for (const [u, ts] of [...c.ringing]) if (t - ts > RING_TIMEOUT) { c.ringing.delete(u); changed = true; }
       if (this.myCall === c.gcid) {
-        await this.callSignal(c, { type: 'call_presence', st: this.myState });
+        await this.callSignal(c, { type: 'call_presence', st: this.presenceSt() });
+        await this.healLinks(c);
         const ch = this.q1('SELECT kind FROM chats WHERE id=?', c.chatId);
         if (ch && ch.kind === 'dm' && !c.parts.size && !c.ever.size && t - c.started > RING_TIMEOUT) {
           await this.postSystem(c.chatId, JSON.stringify({ event: 'missed', by: this.me }), 'call');
@@ -1643,7 +1646,7 @@ export class Backend {
     this.myState = { muted: false, deaf: false, cam: false, screen: false };
     for (const u of this.callAudience(c)) if (this.presenceOf(u) !== 'offline') c.ringing.set(u, now());
     await this.callSignal(c, { type: 'call_ring', video: !!d.video });
-    await this.callSignal(c, { type: 'call_presence', st: this.myState });
+    await this.callSignal(c, { type: 'call_presence', st: this.presenceSt() });
     this.callChanged(c);
     this.pushUser(this.me);
     return this.callView(c);
@@ -1656,7 +1659,7 @@ export class Backend {
     this.myCall = c.gcid;
     this.myState = { muted: !!d.muted, deaf: false, cam: false, screen: false };
     if (this.rings.has(c.gcid)) { this.rings.delete(c.gcid); this.emit({ t: 'call_ring_stop', call_id: c.id }); }
-    await this.callSignal(c, { type: 'call_presence', st: this.myState });
+    await this.callSignal(c, { type: 'call_presence', st: this.presenceSt() });
     for (const u of [...c.parts.keys()]) if (!this.peers.has(u) && this.k.pub < this.pub(u)) await this.connectPeer(u, c);
     this.callChanged(c);
     this.pushUser(this.me);
@@ -1691,7 +1694,7 @@ export class Backend {
     const c = this.calls.get(this.myCall);
     if (!c) throw new Err('Not in a call');
     for (const k of ['muted', 'deaf', 'cam', 'screen']) if (k in d) this.myState[k] = !!d[k];
-    await this.callSignal(c, { type: 'call_presence', st: this.myState });
+    await this.callSignal(c, { type: 'call_presence', st: this.presenceSt() });
     this.callChanged(c);
     return true;
   }
@@ -1725,6 +1728,74 @@ export class Backend {
     if (this.turn && this.turn.url) iceServers.push({ urls: [this.turn.url], username: this.turn.user || undefined, credential: this.turn.pass || undefined });
     return { iceServers };
   }
+  // ---- keeping everyone connected (same rules as PC Lobby v16)
+  presenceSt() { return { ...this.myState, links: this.myLinks() }; }
+  linkOk(uid) { const p = this.peers.get(uid); return !!(p && p.ch.a && p.ch.a.readyState === 'open'); }
+  myLinks() { const out = []; for (const u of this.peers.keys()) if (this.linkOk(u)) { try { out.push(this.pub(u).slice(0, 16)); } catch (e) {} } return out; }
+  relayFor(c, uid) {
+    let target;
+    try { target = this.pub(uid).slice(0, 16); } catch (e) { return null; }
+    let best = null;
+    for (const [r, st] of c.parts) {
+      if (r === uid || !this.linkOk(r) || !(st.links || []).includes(target)) continue;
+      const k = this.pub(r);
+      if (!best || k < best[0]) best = [k, r];
+    }
+    return best ? best[1] : null;
+  }
+  async healLinks(c) {
+    const t = Date.now() / 1000;
+    this.dial = this.dial || new Map();
+    this.warned = this.warned || new Set();
+    for (const u of [...c.parts.keys()]) {
+      if (u === this.me || this.linkOk(u)) { this.dial.delete(u); continue; }
+      const p = this.peers.get(u);
+      const [first, last, n] = this.dial.get(u) || [t, 0, 0];
+      this.dial.set(u, [first, last, n]);
+      const lower = this.k.pub < this.pub(u);
+      const stuck = !p || t - p.born > 12 || ['failed', 'closed'].includes(p.pc.connectionState);
+      if (stuck && t - last > (lower ? 12 : 25) && (lower || t - first > 20)) {
+        this.dial.set(u, [first, t, n + 1]);
+        this.closePeer(u);
+        await this.connectPeer(u, c);
+      }
+      if (t - first > 30 && !this.warned.has(u) && !this.relayFor(c, u)) {
+        this.warned.add(u);
+        this.emit({ t: 'call_declined', call_id: c.id, user_id: u,
+          reason: "can't connect to them directly (strict network/NAT). If nobody else in the call can pass their audio along, adding a TURN server in Settings → Advanced fixes it" });
+      }
+    }
+    for (const u of [...this.dial.keys()]) if (!c.parts.has(u)) this.dial.delete(u);
+  }
+  sendVia(relay, dest, kind, payload) {
+    const p = this.peers.get(relay);
+    if (!p) return;
+    const pre = new Uint8Array(9);
+    pre[0] = 0xf0; pre.set(unhex(this.pub(dest).slice(0, 16)), 1);
+    if (kind === 1) {
+      const ch = p.ch.a;
+      if (!ch || ch.readyState !== 'open') return;
+      const pkt = new Uint8Array(10 + payload.length);
+      pkt.set(pre); pkt[9] = 1; pkt.set(payload, 10);
+      try { ch.send(pkt); this.net.bytes.up += pkt.length; } catch (e) {}
+      return;
+    }
+    const ch = p.ch.v;
+    if (!ch || ch.readyState !== 'open' || ch.bufferedAmount > 1500000) return;
+    p.fidVia = p.fidVia || {};
+    const key = dest + ':' + kind;
+    p.fidVia[key] = ((p.fidVia[key] || 0) + 1) % 65536;
+    const size = 30000, n = Math.max(1, Math.ceil(payload.length / size));
+    if (n > 255) return;
+    for (let i = 0; i < n; i++) {
+      const chunk = payload.subarray(i * size, (i + 1) * size);
+      const pkt = new Uint8Array(chunk.length + 14);
+      pkt.set(pre); pkt[9] = kind; pkt[10] = p.fidVia[key] >> 8; pkt[11] = p.fidVia[key] & 255; pkt[12] = i; pkt[13] = n;
+      pkt.set(chunk, 14);
+      try { ch.send(pkt); } catch (e) {}
+    }
+    this.net.bytes.up += payload.length;
+  }
   setupChannel(peer, ch) {
     ch.binaryType = 'arraybuffer';
     peer.ch[ch.label] = ch;
@@ -1742,8 +1813,7 @@ export class Backend {
         }
         return;
       }
-      this.emit({ t: 'call_declined', call_id: c.id, user_id: peer.uid,
-        reason: "couldn't connect directly (strict network/NAT). Adding a TURN server in Settings → Advanced fixes this" });
+      // (no toast here: healLinks keeps redialling and can route through another member)
     };
   }
   async gathered(pc) {
@@ -1756,7 +1826,7 @@ export class Backend {
   }
   async connectPeer(uid, c) {
     const pc = new RTCPeerConnection(this.rtcConfig());
-    const peer = { uid, pc, ch: {}, frames: new Map(), fid: { 2: 0, 3: 0 }, retried: false };
+    const peer = { uid, pc, ch: {}, frames: new Map(), fid: { 2: 0, 3: 0 }, retried: false, born: Date.now() / 1000 };
     this.peers.set(uid, peer);
     this.watchPc(peer, c);
     this.setupChannel(peer, pc.createDataChannel('a', { ordered: false, maxRetransmits: 0 }));
@@ -1770,9 +1840,11 @@ export class Backend {
     return peer;
   }
   async acceptOffer(uid, c, sdp) {
+    const cur = this.peers.get(uid);
+    if (cur && cur.pc.signalingState === 'have-local-offer' && this.k.pub < this.pub(uid) && Date.now() / 1000 - cur.born < 10) return;   // glare: lower key's offer wins
     this.closePeer(uid);
     const pc = new RTCPeerConnection(this.rtcConfig());
-    const peer = { uid, pc, ch: {}, frames: new Map(), fid: { 2: 0, 3: 0 }, retried: false };
+    const peer = { uid, pc, ch: {}, frames: new Map(), fid: { 2: 0, 3: 0 }, retried: false, born: Date.now() / 1000 };
     this.peers.set(uid, peer);
     this.watchPc(peer, c);
     pc.ondatachannel = (e) => this.setupChannel(peer, e.channel);
@@ -1790,7 +1862,7 @@ export class Backend {
   onPeerData(peer, label, data) {
     const c = this.calls.get(this.myCall);
     if (!c) return;
-    const b = typeof data === 'string' ? te.encode(data) : new Uint8Array(data);
+    let b = typeof data === 'string' ? te.encode(data) : new Uint8Array(data);
     this.net.bytes.down += b.length;
     if (label === 'c') {
       let pl;
@@ -1799,7 +1871,33 @@ export class Backend {
       return;
     }
     if (!b.length) return;
-    const kind = b[0];
+    let kind = b[0];
+    if (kind === 0xf0 && b.length > 9) {           // pass this on to <dest> (they can't reach each other directly)
+      const dest = hex(b.subarray(1, 9));
+      for (const [u, p] of this.peers) {
+        if (u !== peer.uid && this.pub(u).slice(0, 16) === dest) {
+          const ch = p.ch[label];
+          if (ch && ch.readyState === 'open' && ch.bufferedAmount < 1500000) {
+            const out = new Uint8Array(b.length);
+            out[0] = 0xf1; out.set(unhex(this.pub(peer.uid).slice(0, 16)), 1); out.set(b.subarray(9), 9);
+            try { ch.send(out); } catch (e) {}
+          }
+          break;
+        }
+      }
+      return;
+    }
+    if (kind === 0xf1 && b.length > 9) {           // media from <origin>, passed along by this peer
+      const org = hex(b.subarray(1, 9));
+      const uid = [...c.parts.keys()].find((u) => this.pub(u).slice(0, 16) === org);
+      if (uid === undefined || (label === 'a' && this.linkOk(uid))) return;
+      this.origins = this.origins || new Map();
+      if (!this.origins.has(uid)) this.origins.set(uid, { uid, frames: new Map() });
+      peer = this.origins.get(uid);
+      b = b.subarray(9);
+      if (!b.length) return;
+      kind = b[0];
+    }
     if (label === 'a' && kind === 1) this.net.media(peer.uid, 1, b.subarray(1));
     else if (label === 'v' && (kind === 2 || kind === 3) && b.length > 5) {
       const fid = (b[1] << 8) | b[2], idx = b[3], n = b[4];
@@ -1826,6 +1924,13 @@ export class Backend {
   sendMedia(kind, payload) {
     if (!this.myCall) return;
     const c = this.calls.get(this.myCall);
+    if (c) {                                        // members we can't reach directly: through a shared friend
+      for (const uid of c.parts.keys()) {
+        if (uid === this.me || this.linkOk(uid) || (kind === 1 && c.parts.get(uid)?.deaf)) continue;
+        const r = this.relayFor(c, uid);
+        if (r) this.sendVia(r, uid, kind, payload);
+      }
+    }
     for (const [uid, p] of this.peers) {
       if (kind === 1) {
         if (c && c.parts.get(uid)?.deaf) continue;

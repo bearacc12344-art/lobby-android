@@ -1,4 +1,5 @@
 import { html, useState, useEffect } from './h.js';
+import { I } from '../util/icons.js';
 import { ctx } from '../ctx.js';
 import { S } from '../util/settings.js';
 import { tr } from '../util/i18n.js';
@@ -60,7 +61,7 @@ export function Select({ k, label, options, onChange }) {
 }
 
 export function TopBar({ title, back = true, children, sub }) {
-  return html`<div class="topbar">${back ? html`<button class="iconbtn" onClick=${() => ctx.pop()}>⬅️</button>` : null}
+  return html`<div class="topbar">${back ? html`<button class="iconbtn" onClick=${() => ctx.pop()}>${I('⬅️')}</button>` : null}
     <div class="title"><b style=${{ fontSize: '1.15em' }}>${title}</b>${sub ? html`<div class="small muted ellipsis">${sub}</div>` : null}</div>${children}</div>`;
 }
 
