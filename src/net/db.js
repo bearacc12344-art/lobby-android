@@ -1,4 +1,4 @@
-// The local SQLite database (sql.js = real SQLite in WebAssembly), same schema as PC Lobby. Saved to IndexedDB a few
+// The local SQLite database (sql.js = real SQLite in WebAssembly), same schema as PC Smult. Saved to IndexedDB a few
 // seconds after every change and whenever the app goes to the background.
 import initSqlJs from 'sql.js';
 import wasmUrl from 'sql.js/dist/sql-wasm.wasm?url';
@@ -37,6 +37,8 @@ CREATE TABLE IF NOT EXISTS reads(chat_id INTEGER, user_id INTEGER, msg_id INTEGE
 CREATE TABLE IF NOT EXISTS badge_ev(pubkey TEXT PRIMARY KEY, created INTEGER, body TEXT);
 CREATE TABLE IF NOT EXISTS stash(id TEXT PRIMARY KEY, gid TEXT, created INTEGER, raw TEXT);
 CREATE TABLE IF NOT EXISTS kv(k TEXT PRIMARY KEY, v TEXT);
+CREATE TABLE IF NOT EXISTS statuses(id TEXT PRIMARY KEY, author INTEGER, created INTEGER, expires INTEGER, body TEXT, seen INTEGER DEFAULT 0);
+CREATE TABLE IF NOT EXISTS status_views(status_id TEXT, user_id INTEGER, ts REAL, PRIMARY KEY(status_id, user_id));
 `;
 
 export class LocalDB {
@@ -45,6 +47,7 @@ export class LocalDB {
     const saved = await idb.get('kv', 'db:' + name).catch(() => null);
     const d = new LocalDB(name, saved ? new SQL.Database(saved) : new SQL.Database());
     d.db.exec(SCHEMA);
+    for (const col of ['pic', 'pic_url']) { try { d.db.exec(`ALTER TABLE chats ADD COLUMN ${col} TEXT DEFAULT ''`); } catch (e) { /* already there */ } }
     return d;
   }
   constructor(name, db) {

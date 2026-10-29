@@ -1,4 +1,4 @@
-// GIF search with no key (reads GIPHY's public search page, Tenor as backup - same as PC Lobby), optional API keys,
+// GIF search with no key (reads GIPHY's public search page, Tenor as backup - same as PC Smult), optional API keys,
 // and "My GIFs" favourites kept on the phone.
 import { S } from './util/settings.js';
 import { httpText, httpGet } from './net/http.js';

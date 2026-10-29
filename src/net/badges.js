@@ -15,20 +15,20 @@ export const TIERS = {
 };
 
 export const BUILTIN = {
-  owner: { name: 'Owner', emoji: '👑', tier: 'legendary', desc: 'Runs Lobby', auto: true },
+  owner: { name: 'Owner', emoji: '👑', tier: 'legendary', desc: 'Runs Smult', auto: true },
   admin: { name: 'Admin', emoji: '🛡️', tier: 'epic', desc: 'Can give out badges', auto: true },
-  first: { name: 'First to join', emoji: '🥇', tier: 'legendary', desc: 'The very first person in Lobby' },
-  early: { name: 'Early bird', emoji: '🌅', tier: 'epic', desc: 'Joined when Lobby was brand new' },
+  first: { name: 'First to join', emoji: '🥇', tier: 'legendary', desc: 'The very first person in Smult' },
+  early: { name: 'Early bird', emoji: '🌅', tier: 'epic', desc: 'Joined when Smult was brand new' },
   og: { name: 'OG', emoji: '🔥', tier: 'epic', desc: 'Been here since the start' },
-  legend: { name: 'Legend', emoji: '🏆', tier: 'legendary', desc: 'A true Lobby legend' },
+  legend: { name: 'Legend', emoji: '🏆', tier: 'legendary', desc: 'A true Smult legend' },
   vip: { name: 'VIP', emoji: '💎', tier: 'epic', desc: 'Very important person' },
   helper: { name: 'Helper', emoji: '🤝', tier: 'rare', desc: 'Always helps others out' },
   bug: { name: 'Bug hunter', emoji: '🐛', tier: 'rare', desc: 'Found a bug and told us' },
-  builder: { name: 'Builder', emoji: '🛠️', tier: 'rare', desc: 'Helped build Lobby' },
+  builder: { name: 'Builder', emoji: '🛠️', tier: 'rare', desc: 'Helped build Smult' },
   party: { name: 'Life of the party', emoji: '🎉', tier: 'common', desc: 'Makes every call fun' },
   owl: { name: 'Night owl', emoji: '🦉', tier: 'common', desc: 'Always awake in the late calls' },
   star: { name: 'Rising star', emoji: '⭐', tier: 'common', desc: 'Going places' },
-  brain: { name: 'Brain trainer', emoji: '🧠', tier: 'rare', desc: 'Taught the Lobby Brain a lot' },
+  brain: { name: 'Brain trainer', emoji: '🧠', tier: 'rare', desc: 'Taught the Smult Brain a lot' },
 };
 export const GRANTABLE = Object.keys(BUILTIN).filter((k) => !BUILTIN[k].auto);
 

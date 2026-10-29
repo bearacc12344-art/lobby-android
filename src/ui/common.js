@@ -20,6 +20,9 @@ export function Avatar({ user, size = 44, presence = true, ring = false, onClick
 }
 
 export function GroupAvatar({ chat, size = 44 }) {
+  if (chat.pic || chat.pic_url) {   // a group with a photo looks like a user with a picture
+    return html`<${Avatar} user=${{ pic: chat.pic, pic_url: chat.pic_url, display: chat.name }} size=${size} presence=${false} />`;
+  }
   return html`<div class="avatar" style=${{ width: size + 'px', height: size + 'px' }}>
     <div class="inner" style=${{ background: 'var(--panel3)' }}><span class="emoji" style=${{ fontSize: size * 0.5 + 'px' }}>${chat.icon || '👥'}</span></div></div>`;
 }

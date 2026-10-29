@@ -26,15 +26,15 @@ public class LobbyService extends Service {
     public static final String CHANNEL = "lobby_service";
     static final int NOTIF_ID = 4401;
     static boolean keepAlive = false, inCall = false, sharing = false;
-    static String title = "Lobby", text = "Connected";
+    static String title = "Smult", text = "Connected";
     private PowerManager.WakeLock wake;
 
     static void ensureChannel(Context c) {
         if (Build.VERSION.SDK_INT >= 26) {
             NotificationManager nm = c.getSystemService(NotificationManager.class);
             if (nm.getNotificationChannel(CHANNEL) == null) {
-                NotificationChannel ch = new NotificationChannel(CHANNEL, "Lobby running", NotificationManager.IMPORTANCE_LOW);
-                ch.setDescription("Keeps Lobby connected for messages and calls");
+                NotificationChannel ch = new NotificationChannel(CHANNEL, "Smult running", NotificationManager.IMPORTANCE_LOW);
+                ch.setDescription("Keeps Smult connected for messages and calls");
                 ch.setShowBadge(false);
                 nm.createNotificationChannel(ch);
             }

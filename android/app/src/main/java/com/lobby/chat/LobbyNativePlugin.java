@@ -152,7 +152,7 @@ public class LobbyNativePlugin extends Plugin {
                     try (OutputStream o = cr.openOutputStream(uri)) { o.write(data); }
                     saved = "Lobby/" + name;
                 } else {
-                    File dir = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "Lobby");
+                    File dir = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "Smult");
                     dir.mkdirs();
                     File f = new File(dir, name);
                     for (int i = 1; f.exists(); i++) f = new File(dir, i + "_" + name);
@@ -207,7 +207,7 @@ public class LobbyNativePlugin extends Plugin {
     @PluginMethod
     public void keepAlive(PluginCall call) {
         LobbyService.keepAlive = call.getBoolean("on", false);
-        LobbyService.title = call.getString("title", "Lobby");
+        LobbyService.title = call.getString("title", "Smult");
         LobbyService.text = call.getString("text", "Connected");
         try { LobbyService.refresh(getContext()); } catch (Exception e) { call.reject(String.valueOf(e.getMessage())); return; }
         call.resolve();
@@ -266,7 +266,7 @@ public class LobbyNativePlugin extends Plugin {
             NotificationManager m = c.getSystemService(NotificationManager.class);
             if (m.getNotificationChannel(CALL_CHANNEL) == null) {
                 NotificationChannel ch = new NotificationChannel(CALL_CHANNEL, "Incoming calls", NotificationManager.IMPORTANCE_HIGH);
-                ch.setDescription("Rings when someone calls you on Lobby");
+                ch.setDescription("Rings when someone calls you on Smult");
                 ch.setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE),
                         new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_NOTIFICATION_RINGTONE).build());
                 ch.enableVibration(true);

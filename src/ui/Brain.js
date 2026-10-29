@@ -1,4 +1,4 @@
-// 🧠 The Lobby Brain: the community picture brain + the language brain (port of brain.BrainView / lang.LangView)
+// 🧠 The Smult Brain: the community picture brain + the language brain (port of brain.BrainView / lang.LangView)
 import { I } from '../util/icons.js';
 import { html, useBus, useEffect, useRef, useState } from './h.js';
 import { ctx } from '../ctx.js';
@@ -318,13 +318,13 @@ function LangPage() {
     if (!files.length) return;
     if (lg.job) return ctx.toast('Already reading something — wait for it or stop it first');
     const total = files.reduce((s, f) => s + f.size, 0);
-    if (!await ctx.confirm(`${files.length} ${tr('document(s)')} · ${(total / 1e6).toFixed(1)} MB\n\n⚠️ ${tr('Everything you feed it is public. Anyone using Lobby (and anyone looking at the relays) can read it. Don\'t feed private stuff.')}`, { ok: tr('Feed it 📚') })) return;
+    if (!await ctx.confirm(`${files.length} ${tr('document(s)')} · ${(total / 1e6).toFixed(1)} MB\n\n⚠️ ${tr('Everything you feed it is public. Anyone using Smult (and anyone looking at the relays) can read it. Don\'t feed private stuff.')}`, { ok: tr('Feed it 📚') })) return;
     lg.lastJob = lg.startImport(files, 500);
     ctx.bus.emit('langjob');
   };
   const teachPaste = async () => {
     if (paste.trim().length < 20) return ctx.toast('Paste a bit more text first (at least a sentence)');
-    if (!await ctx.confirm('This text becomes public for everyone using Lobby. Teach it?')) return;
+    if (!await ctx.confirm('This text becomes public for everyone using Smult. Teach it?')) return;
     const t = paste;
     setPaste('');
     ctx.toast(`📚 Teaching ${num(t.length)} characters...`, 'ok');
@@ -334,7 +334,7 @@ function LangPage() {
   const [si, stxt] = stage(st.bpc);
   const me = (st.contrib || {})[st.myPub || ''] || {};
   return html`<div class="pad">
-    <div class="muted small">${tr("Feed it PDFs, Word docs and text files. It reads letter by letter and slowly figures out how language works: first common letters, then spaces and syllables, then real words. Everyone's Lobby trains it together.")}</div>
+    <div class="muted small">${tr("Feed it PDFs, Word docs and text files. It reads letter by letter and slowly figures out how language works: first common letters, then spaces and syllables, then real words. Everyone's Smult trains it together.")}</div>
     <div style=${{ margin: '10px 0' }}><${Chips} items=${[['📉', st.bpc !== null && st.bpc !== undefined ? st.bpc.toFixed(2) : '—', 'bits per letter'], ['🔤', num(st.chars), 'characters read'],
       ['📄', st.docs || 0, 'documents'], ['⚙', num(st.totalSteps), 'training steps'], ['🖥', (st.online || 0) + (S.get('brain_train') ? 1 : 0), 'devices training now'],
       ['🙋', `${num(me.chars)} chars · ${num(me.steps)} steps`, 'by you']]} /></div>
@@ -391,7 +391,7 @@ export function BrainHub() {
     if (m) m.ensureLoaded();
     ctx.brainTab = tab;
   }, [tab, !!ctx.brain, !!ctx.lang]);
-  return html`<div class="topbar"><h1>${I('🧠')} ${tr('The Lobby Brain')}</h1></div>
+  return html`<div class="topbar"><h1>${I('🧠')} ${tr('The Smult Brain')}</h1></div>
     <div class="chips" style=${{ paddingTop: 0 }}>
       <button class=${'chip' + (tab === 0 ? ' on' : '')} onClick=${() => setTab(0)}>${I('🖼')} ${tr('Pictures')}</button>
       <button class=${'chip' + (tab === 1 ? ' on' : '')} onClick=${() => setTab(1)}>${I('📚')} ${tr('Language')}</button>

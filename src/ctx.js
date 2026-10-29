@@ -137,7 +137,7 @@ ctx.afterLogin = () => {
 
 function keepAlive(on) {
   if (!isNative) return;
-  LobbyNative.keepAlive({ on: !!on, title: 'Lobby', text: tr('Connected — you get messages and calls') }).catch(() => {});
+  LobbyNative.keepAlive({ on: !!on, title: 'Smult', text: tr('Connected — you get messages and calls') }).catch(() => {});
 }
 S.on((k, v) => { if (k === 'keep_alive' && ctx.authed) keepAlive(v); });
 

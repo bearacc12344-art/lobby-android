@@ -165,7 +165,7 @@ function Message({ m, prev, chat, onMenu, highlight, isLast }) {
     </div></div>`;
 }
 
-// ------------------------------------------------------------------ voice recorder (16 kHz WAV, plays everywhere incl. PC Lobby)
+// ------------------------------------------------------------------ voice recorder (16 kHz WAV, plays everywhere incl. PC Smult)
 class Recorder {
   async start() {
     this.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });

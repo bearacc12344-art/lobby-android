@@ -1,4 +1,4 @@
-// Lobby P2P backend - a faithful JavaScript port of p2p.py's Backend, so phones and PCs share the same chats,
+// Smult P2P backend - a faithful JavaScript port of p2p.py's Backend, so phones and PCs share the same chats,
 // friends, groups, calls and community brains. No server: Nostr relays carry signed, end-to-end encrypted events.
 import { Keys, enc, dec, encBytes, decBytes, encPart, decPart, b64, unb64, hex, unhex, randBytes, sha256hex, te } from './crypto.js';
 import { RelayPool } from './relay.js';
@@ -13,7 +13,8 @@ const BLOSSOM = globalThis.LOBBY_BLOSSOM || ['https://blossom.nostr.build', 'htt
 const STUN = ['stun:stun.l.google.com:19302', 'stun:stun.cloudflare.com:3478'];
 
 export const K_DIRECT = 4444, K_GROUP = 4445, K_EPH = 24444, K_GEPH = 24445, K_REPL = 30078, K_AUTH = 24242;
-export const K_BRAIN = 4446, K_LANG = 4447;
+export const K_BRAIN = 4446, K_LANG = 4447, K_STATUS = 4448;   // 4448: 24h status posts, encrypted to each friend
+const STATUS_TTL = 24 * 3600;
 export const D_PROFILE = 'lobby-profile', D_STATE = 'lobby-state', D_BRAIN = 'lobby-brain-ckpt', D_LANG = 'lobby-lang-ckpt';
 const LANG_CHUNK_MAX = 8000;
 export const MAX_FILE = 200 * 1024 * 1024;
@@ -292,7 +293,7 @@ export class Backend {
     const myRole = (mem.find((m) => m.id === this.me) || {}).role || 'member';
     const users = {};
     for (const m of mem) users[m.id] = this.userPub(m.id);
-    return { id: cid, kind: c.kind, name: c.name, icon: c.icon, topic: c.topic, created_by: c.created_by, created: c.created || 0,
+    return { id: cid, kind: c.kind, name: c.name, icon: c.icon, topic: c.topic, pic: c.pic || '', pic_url: c.pic_url || '', created_by: c.created_by, created: c.created || 0,
       members: mem, users, my: { role: myRole, last_read: c.last_read, muted: !!c.muted, pinned: !!c.pinned, archived: !!c.archived },
       last: last ? this.msgView(last) : null, unread: unread.length, mentions, reads, call, pins };
   }
@@ -391,6 +392,8 @@ export class Backend {
     f.push({ kinds: [K_REPL], '#d': [D_BRAIN], limit: 60 });
     f.push({ kinds: [K_LANG], '#t': ['lobby-lang'], limit: 4000 });
     f.push({ kinds: [K_REPL], '#d': [D_LANG], limit: 60 });
+    f.push({ kinds: [K_STATUS], '#p': [this.k.pub], since: Math.floor(now()) - STATUS_TTL });
+    f.push({ kinds: [K_STATUS], authors: [this.k.pub], since: Math.floor(now()) - STATUS_TTL });
     const g = this.gids();
     if (g.length) {
       f.push({ kinds: [K_GROUP], '#g': g, since, limit: 5000 });
@@ -409,7 +412,7 @@ export class Backend {
 
   // ------------------------------------------------------------------ incoming (processed one at a time, in order)
   onEvent(ev) {
-    if (this.syncing && [K_DIRECT, K_GROUP, K_REPL, K_BRAIN, K_LANG].includes(ev.kind)) { this.syncBuf.push(ev); return; }
+    if (this.syncing && [K_DIRECT, K_GROUP, K_REPL, K_BRAIN, K_LANG, K_STATUS].includes(ev.kind)) { this.syncBuf.push(ev); return; }
     this.procQueue.push(ev);
     if (!this.processing) fire(this.drain());
   }
@@ -426,6 +429,7 @@ export class Backend {
   async process(ev, live = null) {
     live = live === null ? !this.syncing : live;
     const k = ev.kind;
+    if (k === K_STATUS) return this.applyStatus(ev, live);
     if (k === K_BRAIN) return this.applyBrainEx(ev, live);
     if (k === K_LANG) return this.applyLangTxt(ev, live);
     if (k === K_REPL) {
@@ -828,6 +832,10 @@ export class Backend {
     for (const [pub, role] of Object.entries(members)) {
       if (isHex64(pub)) this.x('INSERT OR REPLACE INTO members VALUES(?,?,?,?)', cid, this.uid(pub), role, ts);
     }
+    if (pl.pic !== undefined) {
+      const pic = String(pl.pic || ''), url = String(pl.pic_url || '');
+      this.x('UPDATE chats SET pic=?, pic_url=? WHERE id=?', pic.length <= 48000 ? pic : '', url.startsWith('https://') ? url : '', cid);
+    }
     if (live) {
       fire((async () => {
         this.resubscribe();
@@ -916,6 +924,10 @@ export class Backend {
     const t = (pl.ms || 0) / 1000;
     if (op === 'update' && admin) {
       for (const [k, n] of [['name', 48], ['icon', 16], ['topic', 200]]) if (k in pl) this.x(`UPDATE chats SET ${k}=? WHERE id=?`, String(pl[k]).slice(0, n), cid);
+      if ('pic' in pl) {
+        const pic = String(pl.pic || ''), url = String(pl.pic_url || '');
+        this.x('UPDATE chats SET pic=?, pic_url=? WHERE id=?', pic.length <= 48000 ? pic : '', url.startsWith('https://') && url.length < 400 ? url : '', cid);
+      }
     } else if (op === 'add' && admin && tgt) {
       this.x("INSERT OR IGNORE INTO members VALUES(?,?,?,?)", cid, tgt, 'member', t);
     } else if (op === 'kick' && admin && tgt && this.role(cid, tgt) !== 'owner') {
@@ -969,6 +981,12 @@ export class Backend {
         await this.sendPresence([author]);
       }
       if (this.presenceOf(author) !== was || pl.hi) this.pushUser(author);
+    } else if (t === 'status_seen' && !cid) {
+      const sid = String(pl.id || '').slice(0, 64);
+      if (this.q1('SELECT 1 FROM statuses WHERE id=? AND author=?', sid, this.me)) {
+        this.x('INSERT OR IGNORE INTO status_views VALUES(?,?,?)', sid, author, now());
+        this.emit({ t: 'status_views', id: sid, views: this.statusViews(sid) });
+      }
     } else if (t === 'typing') {
       const c = cid || this.dmChat(author);
       if (c) this.emit({ t: 'typing', chat_id: c, user_id: author });
@@ -1002,6 +1020,15 @@ export class Backend {
     if (this.stateDirty) { this.stateDirty = false; await this.publishState(); }
   }
   async housekeepingTick() {
+    this.hkN = (this.hkN || 0) + 1;
+    if (this.hkN % 20 === 1) {                    // statuses vanish after 24 h
+      const gone = this.q('SELECT id FROM statuses WHERE expires<?', Math.floor(now())).map((r) => r.id);
+      if (gone.length) {
+        for (const i of gone) this.x('DELETE FROM status_views WHERE status_id=?', i);
+        this.x('DELETE FROM statuses WHERE expires<?', Math.floor(now()));
+        this.emit({ t: 'status_removed', ids: gone });
+      }
+    }
     for (const m of this.q('SELECT * FROM messages WHERE shown=0 AND created<=?', now())) {
       this.x('UPDATE messages SET shown=1 WHERE id=?', m.id);
       if (!this.q1('SELECT 1 FROM deletes WHERE msg_id=?', m.id)) this.emit({ t: 'message', msg: this.msgView({ ...m, shown: 1 }) });
@@ -1075,7 +1102,7 @@ export class Backend {
     if (!cands.length) {
       const r = this.q1('SELECT id FROM users WHERE lower(username)=? AND pubkey LIKE ?', name.toLowerCase(), (code.toLowerCase() || '') + '%');
       if (r) return r.id;
-      throw new Err('No user with that name (they need to have opened Lobby at least once)');
+      throw new Err('No user with that name (they need to have opened Smult at least once)');
     }
     if (cands.length > 1) throw new Err(`Several people are called ${name} — ask for their friend code (like ${name}#ab12)`);
     return this.applyProfile(cands[0]) || this.uid(cands[0].pubkey);
@@ -1187,7 +1214,7 @@ export class Backend {
     for (const r of this.q('SELECT ver, key FROM gkeys WHERE gid=?', gid)) keys[String(r.ver)] = r.key;
     const mem = {};
     for (const r of this.q('SELECT * FROM members WHERE chat_id=?', cid)) mem[this.pub(r.user_id)] = r.role;
-    return { type: 'group_invite', gid, keys, members: mem, name: c.name, icon: c.icon, topic: c.topic,
+    return { type: 'group_invite', gid, keys, members: mem, name: c.name, icon: c.icon, topic: c.topic, pic: c.pic || '', pic_url: c.pic_url || '',
       created_by: c.created_by ? this.pub(c.created_by) : this.k.pub, created: c.created };
   }
   async inviteAll(cid, uids) {
@@ -1204,9 +1231,20 @@ export class Backend {
     if (!['owner', 'admin'].includes(this.role(cid, this.me))) throw new Err('Only group admins can do that');
     const pl = { type: 'meta', op: 'update' };
     for (const k of ['name', 'icon', 'topic']) if (k in d) pl[k] = String(d[k]);
+    if ('pic' in d) {
+      const pic = String(d.pic || '');
+      if (pic.length > 48000) throw new Err('Picture is too big');
+      pl.pic = pic; pl.pic_url = '';
+      if (d.gif) {
+        const raw = d.gif instanceof Uint8Array ? d.gif : unb64(d.gif);
+        if (raw.length > 3 * 1024 * 1024) throw new Err('GIF is too big (max 3 MB after shrinking)');
+        pl.pic_url = await this.upload(raw);
+      }
+    }
     this.applyMeta(cid, this.me, { ...pl }, true);
     await this.sendGroup(cid, pl);
     if ('name' in d) await this.postSystem(cid, `${this.name(this.me)} updated the group`);
+    else if ('pic' in d) await this.postSystem(cid, d.pic ? `${this.name(this.me)} changed the group photo` : `${this.name(this.me)} removed the group photo`);
     return true;
   }
   async on_group_add(d) {
@@ -1462,6 +1500,99 @@ export class Backend {
       if (Date.now() - last > 400 || sent >= raw.length) { last = Date.now(); this.transfer('up', name, sent, raw.length, t0, tid); }
     });
     return urls;
+  }
+  // ------------------------------------------------------------------ status (24 h posts, same format as PC Smult)
+  async applyStatus(ev, live) {
+    const exp = tag(ev, 'expiration');
+    let expires = exp ? parseInt(exp, 10) : ev.created_at + STATUS_TTL;
+    if (!Number.isFinite(expires)) return;
+    expires = Math.min(expires, ev.created_at + STATUS_TTL);
+    if (expires < now() || this.q1('SELECT 1 FROM statuses WHERE id=?', ev.id)) return;
+    const author = this.uid(ev.pubkey);
+    if (author !== this.me && (this.blocked(author) || !this.isFriend(author))) return;
+    const t = (ev.tags || []).find((x) => x.length >= 3 && x[0] === 'k' && x[1] === this.k.pub.slice(0, 16));
+    if (!t) return;
+    let body;
+    try {
+      const ckey = unb64((await dec(this.k.shared(ev.pubkey), t[2])).c);
+      body = await dec(ckey, ev.content);
+    } catch (e) { return; }
+    const kind = body.kind === 'image' ? 'image' : 'text';
+    const clean = { kind, text: String(body.text || '').slice(0, 700), bg: String(body.bg || '').slice(0, 9), font: String(body.font || '').slice(0, 12) };
+    const f = body.file;
+    if (kind === 'image' && f && String(f.url || '').startsWith('http')) clean.file = { url: String(f.url).slice(0, 400), k: String(f.k || '').slice(0, 64), size: parseInt(f.size || 0, 10) };
+    this.x('INSERT OR IGNORE INTO statuses(id, author, created, expires, body) VALUES(?,?,?,?,?)', ev.id, author, ev.created_at, expires, JSON.stringify(clean));
+    if (live) this.emit({ t: 'status', status: this.statusView(this.q1('SELECT * FROM statuses WHERE id=?', ev.id)) });
+  }
+  statusViews(sid) { return this.q('SELECT * FROM status_views WHERE status_id=? ORDER BY ts', sid).map((r) => ({ user_id: r.user_id, ts: r.ts })); }
+  statusView(r) {
+    const b = JSON.parse(r.body);
+    const v = { id: r.id, user_id: r.author, created: r.created, expires: r.expires, seen: !!r.seen, kind: b.kind || 'text', text: b.text || '',
+      bg: b.bg || '', font: b.font || '', has_file: !!b.file };
+    if (r.author === this.me) v.views = this.statusViews(r.id);
+    return v;
+  }
+  async on_status_list() {
+    const by = new Map();
+    for (const r of this.q('SELECT * FROM statuses WHERE expires>=? ORDER BY created', Math.floor(now()))) {
+      if (r.author !== this.me && (this.blocked(r.author) || !this.isFriend(r.author))) continue;
+      if (!by.has(r.author)) by.set(r.author, []);
+      by.get(r.author).push(this.statusView(r));
+    }
+    const out = [...by].map(([u, items]) => ({ user_id: u, items, unseen: u === this.me ? 0 : items.filter((i) => !i.seen).length, latest: items[items.length - 1].created }));
+    out.sort((a, b) => (a.user_id !== this.me) - (b.user_id !== this.me) || (a.unseen === 0) - (b.unseen === 0) || b.latest - a.latest);
+    return out;
+  }
+  async on_status_post(d) {
+    const kind = d.kind === 'image' ? 'image' : 'text';
+    const body = { kind, text: String(d.text || '').slice(0, 700), bg: String(d.bg || '#29e0ff').slice(0, 9), font: String(d.font || '').slice(0, 12) };
+    if (kind === 'text' && !body.text.trim()) throw new Err('Write something first');
+    if (kind === 'image') {
+      const raw = d.bytes || unb64(d.data || '');
+      if (!raw.length || raw.length > 15 * 1024 * 1024) throw new Err('Picture is too big (max 15 MB)');
+      const fkey = randBytes(32);
+      const url = await this.upload(await encBytes(fkey, raw));
+      body.file = { url, k: b64(fkey), size: raw.length };
+    }
+    const ckey = randBytes(32);
+    const pubs = this.q("SELECT user_id FROM relations WHERE state='friend'").map((r) => this.pub(r.user_id)).concat([this.k.pub]);
+    const tags = [['t', 'lobby-status'], ['expiration', String(Math.floor(now()) + STATUS_TTL)]];
+    for (const pk of pubs) {
+      tags.push(['p', pk]);
+      tags.push(['k', pk.slice(0, 16), await enc(this.k.shared(pk), { c: b64(ckey) })]);
+    }
+    const ev = this.k.sign(K_STATUS, tags, await enc(ckey, body));
+    await this.applyStatus(ev, false);
+    this.pool.publish(ev);
+    const v = this.statusView(this.q1('SELECT * FROM statuses WHERE id=?', ev.id));
+    this.emit({ t: 'status', status: v });
+    return v;
+  }
+  async on_status_seen(d) {
+    const r = this.q1('SELECT * FROM statuses WHERE id=?', String(d.id || ''));
+    if (!r || r.seen) return true;
+    this.x('UPDATE statuses SET seen=1 WHERE id=?', r.id);
+    if (r.author !== this.me) await this.sendEph([r.author], { type: 'status_seen', id: r.id });
+    return true;
+  }
+  async on_status_views(d) { return this.statusViews(String(d.id || '')); }
+  async on_status_media(d) {
+    const r = this.q1('SELECT * FROM statuses WHERE id=?', String(d.id || ''));
+    if (!r) throw new Err('That status is gone');
+    const f = JSON.parse(r.body).file;
+    if (!f) throw new Err('No picture');
+    let blob;
+    try { blob = await httpGet(f.url); } catch (e) { throw new Err('Download failed: ' + (e.message || e)); }
+    try { return { bytes: await decBytes(unb64(f.k), blob) }; } catch (e) { throw new Err('File is corrupted'); }
+  }
+  async on_status_delete(d) {
+    const sid = String(d.id || '');
+    if (!this.q1('SELECT 1 FROM statuses WHERE id=? AND author=?', sid, this.me)) throw new Err('You can only delete your own status');
+    this.pool.publish(this.k.sign(5, [['e', sid], ['k', String(K_STATUS)]], 'deleted'));
+    this.x('DELETE FROM statuses WHERE id=?', sid);
+    this.x('DELETE FROM status_views WHERE status_id=?', sid);
+    this.emit({ t: 'status_removed', ids: [sid] });
+    return true;
   }
   async on_get_file(d) {
     const m = this.q1('SELECT file FROM messages WHERE fid=?', String(d.file_id || ''));
@@ -1728,7 +1859,7 @@ export class Backend {
     if (this.turn && this.turn.url) iceServers.push({ urls: [this.turn.url], username: this.turn.user || undefined, credential: this.turn.pass || undefined });
     return { iceServers };
   }
-  // ---- keeping everyone connected (same rules as PC Lobby v16)
+  // ---- keeping everyone connected (same rules as PC Smult v16)
   presenceSt() { return { ...this.myState, links: this.myLinks() }; }
   linkOk(uid) { const p = this.peers.get(uid); return !!(p && p.ch.a && p.ch.a.readyState === 'open'); }
   myLinks() { const out = []; for (const u of this.peers.keys()) if (this.linkOk(u)) { try { out.push(this.pub(u).slice(0, 16)); } catch (e) {} } return out; }
@@ -1817,7 +1948,7 @@ export class Backend {
     };
   }
   async gathered(pc) {
-    // aiortc (PC Lobby) doesn't do trickle ICE: wait until every candidate is in the SDP
+    // aiortc (PC Smult) doesn't do trickle ICE: wait until every candidate is in the SDP
     if (pc.iceGatheringState === 'complete') return;
     await new Promise((res) => {
       const t = setTimeout(res, 3500);

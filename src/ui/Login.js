@@ -32,7 +32,7 @@ export function Login() {
   const key = (e) => { if (e.key === 'Enter') go(); };
   return html`<div class="screen" style=${{ overflowY: 'auto' }}>
     <div style=${{ padding: 'calc(30px + env(safe-area-inset-top)) 22px 22px', display: 'flex', flexDirection: 'column', gap: '12px', maxWidth: '460px', margin: '0 auto', width: '100%' }}>
-      <div class="center emoji" style=${{ fontSize: '62px' }}>${I('🚪')}</div>
+      <div class="center"><img src="./assets/smult.png" class="applogo" style=${{ width: '108px', height: '108px' }} /></div>
       <div class="center" style=${{ fontSize: '46px', fontWeight: 700, color: 'var(--accent)', letterSpacing: '3px' }}>LOBBY</div>
       <div class="center muted">${tr('chat · call · share  —  with ur friends')}</div>
       <div class="chips" style=${{ justifyContent: 'center', padding: '10px 0' }}>
@@ -47,7 +47,7 @@ export function Login() {
       ${tab === 'signup' ? html`<input class="field" type="password" placeholder=${tr('Repeat password')} value=${pw2} onInput=${(e) => setPw2(e.target.value)} onKeyDown=${key} />` : null}
       <label class="check" onClick=${(e) => { e.preventDefault(); setRemember(!remember); }}><span class="grow">${tr('Keep me logged in')}</span>
         <span class=${'switch' + (remember ? ' on' : '')}></span></label>
-      <button class="btn primary block" disabled=${busy} onClick=${go}>${tr(tab === 'signup' ? 'Create account' : 'Enter the Lobby')}</button>
+      <button class="btn primary block" disabled=${busy} onClick=${go}>${tr(tab === 'signup' ? 'Create account' : 'Enter the Smult')}</button>
       ${msg ? html`<div class=${'small center' + (err ? '' : ' muted')} style=${{ color: err ? 'var(--danger)' : undefined }}>${msg}</div>` : null}
       ${tab === 'signup' ? html`<div class="small muted center">${tr("No server, no email: your username + password ARE your account, so you can log in from any PC. There's no reset, so don't forget it!")}</div>` : null}
       <div class="small muted center" style=${{ marginTop: '20px' }}>${tr('🔒 Peer-to-peer · end-to-end encrypted · no server needed')}</div>

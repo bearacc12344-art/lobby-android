@@ -1,4 +1,4 @@
-// Same crypto as PC Lobby (p2p.py): scrypt key from username+password, BIP340 Schnorr (Nostr) signatures,
+// Same crypto as PC Smult (p2p.py): scrypt key from username+password, BIP340 Schnorr (Nostr) signatures,
 // ECDH -> AES-256-GCM end-to-end encryption.
 import { schnorr, secp256k1 } from '@noble/curves/secp256k1.js';
 import { sha256 } from '@noble/hashes/sha2.js';

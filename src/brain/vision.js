@@ -1,4 +1,4 @@
-// The Lobby Brain (pictures) - main-thread side. Training/scoring happen in visionWorker.js.
+// The Smult Brain (pictures) - main-thread side. Training/scoring happen in visionWorker.js.
 import { rpc, mayTrain } from './rpc.js';
 import { S } from '../util/settings.js';
 import { b64 } from './pics.js';

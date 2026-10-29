@@ -1,4 +1,4 @@
-// Background music (port of music.py): loops while Lobby is open, fades out during calls, chat audio, or in the background.
+// Background music (port of music.py): loops while Smult is open, fades out during calls, chat audio, or in the background.
 // Library = the built-in song + songs you add (files from your phone, or YouTube downloads on Android).
 import { Capacitor } from '@capacitor/core';
 import { S } from './util/settings.js';

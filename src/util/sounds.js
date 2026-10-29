@@ -1,5 +1,5 @@
 // UI sounds (message, mention, ring...), seasonal packs (Halloween / Christmas) and the built-in soundboard -
-// the exact sounds PC Lobby synthesises, pre-rendered to files.
+// the exact sounds PC Smult synthesises, pre-rendered to files.
 import { audioCtx } from './audioctx.js';
 import { S } from './settings.js';
 

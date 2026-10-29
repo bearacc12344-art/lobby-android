@@ -1,4 +1,4 @@
-// Lobby's drawn icons (same set as PC Lobby): I('📞') -> inline SVG that follows the theme colours.
+// Smult's drawn icons (same set as PC Smult): I('📞') -> inline SVG that follows the theme colours.
 // Anything without a drawn icon stays the emoji. People's messages never go through this.
 import { h } from 'preact';
 import { ICON_MAP, ICON_SVG } from './icons_data.js';

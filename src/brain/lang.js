@@ -1,4 +1,4 @@
-// The Lobby Brain - language half (main-thread side). Training lives in langWorker.js.
+// The Smult Brain - language half (main-thread side). Training lives in langWorker.js.
 import { rpc, mayTrain } from './rpc.js';
 import { S } from '../util/settings.js';
 import { normalize } from './langModel.js';

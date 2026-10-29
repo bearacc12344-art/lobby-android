@@ -1,0 +1,84 @@
+/* ===================================================================== UI skins (Settings → Appearance → Style)
+   Each skin only restyles; layout and features are the same. html class: skin-neon | skin-lux | skin-clean        */
+
+/* ---------------------------------------------------------------- 1. NEON GLASS: frosted glass, glowing gradients */
+.skin-neon { --bg: #07061a; --panel: #0d0b26; --panel2: #15123a; --panel3: #1e1a4d; --border: #2b2566; --text: #eef0ff; --muted: #9a97cc;
+  --accent: #29e0ff; --accent-text: #04121a; --bubble: #17143f; --bubble-me: #3a1e6e; --link: #7cf3ff; --ok: #3dffa8;
+  --g1: #29e0ff; --g2: #b44dff; --glass: rgba(16, 13, 48, .72); --ico-sh: #3a3478; }
+.skin-neon body, .skin-neon .screen { background: radial-gradient(120% 70% at 100% 0%, color-mix(in srgb, var(--g2) 22%, transparent), transparent 60%),
+  radial-gradient(90% 60% at 0% 100%, color-mix(in srgb, var(--g1) 16%, transparent), transparent 60%), var(--bg); }
+.skin-neon .topbar { background: var(--glass); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border-bottom: 1px solid color-mix(in srgb, var(--g1) 25%, transparent); }
+.skin-neon .topbar h1 { background: linear-gradient(90deg, var(--g1), var(--g2)); -webkit-background-clip: text; background-clip: text; color: transparent;
+  filter: drop-shadow(0 0 10px color-mix(in srgb, var(--g1) 45%, transparent)); }
+.skin-neon .bottomnav { margin: 0 10px calc(10px + env(safe-area-inset-bottom)); border-radius: 22px; border: 1px solid color-mix(in srgb, var(--g1) 25%, transparent);
+  background: var(--glass); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); box-shadow: 0 8px 30px rgba(0,0,0,.45); padding-bottom: 0; }
+.skin-neon .bottomnav button.on .ic { filter: drop-shadow(0 0 8px var(--g1)); }
+.skin-neon .bottomnav button.on::after { content: ''; position: absolute; bottom: 3px; width: 18px; height: 3px; border-radius: 2px; background: linear-gradient(90deg, var(--g1), var(--g2)); }
+.skin-neon .list .item { margin: 6px 10px; border-radius: 18px; border: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+  background: color-mix(in srgb, var(--panel2) 55%, transparent); min-height: 70px; }
+.skin-neon .avatar .inner { box-shadow: 0 0 0 2px color-mix(in srgb, var(--g1) 55%, transparent), 0 0 14px color-mix(in srgb, var(--g1) 30%, transparent); }
+.skin-neon .badge { background: linear-gradient(135deg, var(--g1), var(--g2)); box-shadow: 0 0 10px color-mix(in srgb, var(--g1) 60%, transparent); color: #fff; }
+.skin-neon .msg .bub { border-radius: 18px; background: color-mix(in srgb, var(--panel2) 75%, transparent); border: 1px solid color-mix(in srgb, var(--border) 70%, transparent); }
+.skin-neon .msg.me .bub { background: linear-gradient(135deg, color-mix(in srgb, var(--g1) 70%, #000), color-mix(in srgb, var(--g2) 65%, #000));
+  border: 0; box-shadow: 0 4px 18px color-mix(in srgb, var(--g1) 25%, transparent); color: #fff; }
+.skin-neon .msg.me .bub .time { color: rgba(255,255,255,.75); }
+.skin-neon .fab, .skin-neon .btn.primary { background: linear-gradient(135deg, var(--g1), var(--g2)); border: 0; color: #fff; box-shadow: 0 6px 22px color-mix(in srgb, var(--g1) 45%, transparent); }
+.skin-neon .composer { background: var(--glass); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); }
+.skin-neon input.field, .skin-neon textarea.field { border-radius: 16px; background: color-mix(in srgb, var(--panel2) 70%, transparent); }
+.skin-neon .sheet { background: color-mix(in srgb, var(--panel) 82%, transparent); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+  border-top: 1px solid color-mix(in srgb, var(--g1) 30%, transparent); }
+.skin-neon .daysep { background: color-mix(in srgb, var(--g1) 18%, transparent); color: var(--text); }
+.skin-neon .ico .f { fill: var(--text); }
+.skin-neon .bottomnav button.on .ico .f { fill: var(--g1); }
+
+/* ---------------------------------------------------------------- 2. HOTEL LUX: warm wood + gold trim, lamp glow  */
+.skin-lux { --gold: #e9c27a; --gold2: #9a6a2c; --wood: #2a1a10; }
+.skin-lux body, .skin-lux .screen { background:
+  radial-gradient(60% 35% at 50% 0%, rgba(255, 196, 110, .13), transparent 70%),
+  repeating-linear-gradient(90deg, rgba(255,255,255,.012) 0 2px, transparent 2px 9px), var(--bg); }
+.skin-lux .topbar { background: linear-gradient(180deg, #2c1d12, #1b120c); border-bottom: 2px solid transparent;
+  border-image: linear-gradient(90deg, transparent, var(--gold), transparent) 1; box-shadow: 0 6px 18px rgba(0,0,0,.5); }
+.skin-lux .msgs { background:
+  radial-gradient(circle at 25% 25%, rgba(233,194,122,.05) 0 6px, transparent 7px) 0 0 / 46px 46px,
+  radial-gradient(circle at 75% 75%, rgba(233,194,122,.04) 0 4px, transparent 5px) 0 0 / 46px 46px; }
+.skin-lux .topbar h1 { color: var(--gold); text-shadow: 0 2px 0 #000, 0 0 16px rgba(233, 194, 122, .35); letter-spacing: .5px; }
+.skin-lux .bottomnav { background: linear-gradient(0deg, #150e09, #24170e); border-top: 2px solid transparent; border-image: linear-gradient(90deg, transparent, var(--gold2), transparent) 1; }
+.skin-lux .bottomnav button.on { color: var(--gold); }
+.skin-lux .bottomnav button.on .ic { filter: drop-shadow(0 0 7px rgba(233, 194, 122, .7)); }
+.skin-lux .bottomnav button.on .ico .f { fill: var(--gold); }
+.skin-lux .list .item { border-bottom: 1px solid rgba(233, 194, 122, .10); }
+.skin-lux .avatar .inner { box-shadow: 0 0 0 2px var(--gold2), 0 0 0 4px rgba(0,0,0,.6); }
+.skin-lux .badge { background: linear-gradient(180deg, var(--gold), var(--gold2)); color: #1a0f05; box-shadow: 0 1px 0 rgba(255,255,255,.3) inset; }
+.skin-lux .msg .bub { background: linear-gradient(180deg, #2a1c13, #20150e); border: 1px solid rgba(233, 194, 122, .14); border-radius: 6px 16px 16px 16px;
+  box-shadow: 0 3px 10px rgba(0,0,0,.35); }
+.skin-lux .msg.me .bub { background: linear-gradient(180deg, #5a3b17, #3e2810); border: 1px solid rgba(233, 194, 122, .35); border-radius: 16px 6px 16px 16px; }
+.skin-lux .fab, .skin-lux .btn.primary { background: linear-gradient(180deg, var(--gold), var(--gold2)); color: #1a0f05; border: 1px solid #f6dca4;
+  box-shadow: 0 4px 14px rgba(0,0,0,.5), 0 0 18px rgba(233, 194, 122, .25); }
+.skin-lux .daysep { background: transparent; color: var(--gold); border: 1px solid rgba(233, 194, 122, .3); }
+.skin-lux .sheet { background: linear-gradient(180deg, #24170e, #160e09); border-top: 2px solid var(--gold2); }
+.skin-lux input.field, .skin-lux textarea.field { background: #140d08; border-color: rgba(233, 194, 122, .25); }
+.skin-lux .section { color: var(--gold); text-shadow: 0 0 10px rgba(233, 194, 122, .3); }
+
+/* ---------------------------------------------------------------- 3. CLEAN PRO: modern flat, big & bold, accent header */
+.skin-clean { --accent: #25d366; --accent-text: #06200f; --bubble-me: #005c4b; --bubble: #202c33; --bg: #0b141a; --panel: #111b21; --panel2: #1f2c34;
+  --panel3: #2a3942; --border: #2a3942; --text: #e9edef; --muted: #8696a0; --ico-sh: #31424c; }
+.skin-clean .topbar .avatar .inner { box-shadow: 0 0 0 2px #fff; }
+.skin-clean .topbar { background: #1f2c34; color: var(--text); border: 0; color: var(--accent-text); min-height: 62px; }
+.skin-clean .topbar h1 { color: var(--text); font-size: 1.55em; font-weight: 800; }
+.skin-clean .msgs { background: radial-gradient(circle at 20% 30%, rgba(255,255,255,.025) 0 2px, transparent 3px) 0 0 / 28px 28px; }
+.skin-clean .bottomnav { background: var(--panel); border-top: 0; box-shadow: 0 -1px 0 var(--border); }
+.skin-clean .bottomnav button.on .ic { background: color-mix(in srgb, var(--accent) 22%, transparent); border-radius: 16px; padding: 2px 18px; }
+.skin-clean .bottomnav button .ic { transition: background .2s; }
+.skin-clean .list .item { border-bottom: 0; min-height: 72px; padding: 10px 16px; }
+.skin-clean .list .item b { font-size: 1.05em; }
+.skin-clean .avatar { transform: scale(1.08); }
+.skin-clean .badge { background: var(--ok); color: #06200d; border-radius: 12px; }
+.skin-clean .msg .bub { border-radius: 10px; box-shadow: 0 1px 1px rgba(0,0,0,.3); }
+.skin-clean .msg:not(.me) .bub { border-top-left-radius: 2px; }
+.skin-clean .msg.me .bub { border-top-right-radius: 2px; background: var(--bubble-me); }
+.skin-clean .fab { border-radius: 30px; background: var(--ok); color: #06200d; }
+.skin-clean .chats-search { margin: 10px 12px; }
+.skin-clean input.field { border-radius: 24px; background: var(--panel2); border: 0; }
+.skin-clean .daysep { background: var(--panel3); color: var(--text); border-radius: 8px; }
+.skin-clean .composer textarea { border-radius: 24px; }
+.skin-clean .sheet { border-radius: 28px 28px 0 0; }

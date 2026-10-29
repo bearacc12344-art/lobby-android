@@ -31,7 +31,7 @@ export class CallSession {
   async start() {
     await this.audio.start();   // mic permission first, so the call service can be a 'microphone' service (Android 14+)
     if (isNative) {
-      await LobbyNative.callService({ on: true, title: 'Lobby', text: tr('🔊 Voice connected') }).catch(() => {});
+      await LobbyNative.callService({ on: true, title: 'Smult', text: tr('🔊 Voice connected') }).catch(() => {});
       await LobbyNative.callAudio({ on: true, speaker: this.speaker }).catch(() => {});
     }
     if (this.audio.error) this.ctx.toast(this.audio.error, 'error', 5000);

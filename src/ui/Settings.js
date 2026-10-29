@@ -13,7 +13,7 @@ import { isNative, LobbyNative } from '../native.js';
 
 const PAGES = [
   ['account', '👤', 'My Account'], ['privacy', '🛡️', 'Privacy & Trust'], ['notifications', '🔔', 'Notifications'], ['appearance', '🎨', 'Appearance'],
-  ['voice', '🎙️', 'Voice & Video'], ['soundboard', '🔊', 'Soundboard'], ['chat', '💬', 'Chat'], ['brain', '🧠', 'The Lobby Brain'],
+  ['voice', '🎙️', 'Voice & Video'], ['soundboard', '🔊', 'Soundboard'], ['chat', '💬', 'Chat'], ['brain', '🧠', 'The Smult Brain'],
   ['advanced', '⚙️', 'Advanced'], ['admin', '🏅', 'Admin & badges'], ['about', 'ℹ️', 'About'],
 ];
 
@@ -116,7 +116,7 @@ function Notifications() {
   return html`<${Page} title="Notifications">
     <${Check} k="notify_desktop" label="Phone notifications (pop-ups)" /><${Check} k="notify_preview" label="Show message text in notifications" />
     <${Check} k="vibrate" label="Vibrate" /><${Check} k="notify_only_mentions_groups" label="In groups, only notify me when I'm @mentioned" />
-    <${Check} k="keep_alive" label="Stay connected in the background" sub="Keeps a small notification so messages and calls arrive even when Lobby is closed. Uses a little battery." />
+    <${Check} k="keep_alive" label="Stay connected in the background" sub="Keeps a small notification so messages and calls arrive even when Smult is closed. Uses a little battery." />
     <${Sec} t="Sounds" /><${Check} k="notify_sounds" label="Play sounds" /><${Check} k="sound_message" label="New message" />
     <${Check} k="sound_mention" label="Mentions (different sound)" /><${Check} k="sound_join_leave" label="Someone joins / leaves a call" />
     <${Check} k="sound_friend" label="Friend requests" /><${Check} k="nudges" label="Allow nudges (shakes the window 👋)" />
@@ -141,7 +141,7 @@ function Appearance() {
   return html`<${Page} title="Appearance">
     <${Sec} t="Language" /><${Select} k="language" label="Language" options=${LANGS} onChange=${() => setWant(detect())} />
     ${want !== langNow ? html`<button class="btn primary block" onClick=${() => location.reload()}>${tr('🔄 Restart now')}</button>` : null}
-    <${Note} t="Chat messages from your friends are never translated, only Lobby's own buttons and text." />
+    <${Note} t="Chat messages from your friends are never translated, only Smult's own buttons and text." />
     <${Sec} t="Theme" />
     <div style=${{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>${Object.entries(THEMES).map(([name, p]) => html`<button class="btn"
       style=${{ background: p.panel2, color: p.text, borderColor: S.get('theme') === name ? p.accent : p.border, borderWidth: '2px', borderLeft: '6px solid ' + p.accent }}
@@ -149,10 +149,11 @@ function Appearance() {
     <div class="row" style=${{ marginTop: '10px' }}><span class="grow">${tr('🎨 Custom accent color')}</span>
       <input type="color" value=${palette().accent} onInput=${(e) => S.set('accent', e.target.value)} />
       <button class="btn small" onClick=${() => { S.set('accent', ''); set((x) => x + 1); }}>${tr('Reset accent')}</button></div>
-    <${Sec} t="Font" /><${Select} k="font" label="Font" options=${[['comic', 'Comic Sans (default)'], ['doors', 'DOORS'], ['system', 'System font']]} />
+    <${Sec} t="Style" /><${Select} k="ui_skin" label="Look" options=${[['neon', 'Neon Glass (default)'], ['lux', 'Hotel Lux'], ['clean', 'Clean Pro'], ['', 'Classic']]} />
+    <${Sec} t="Font" /><${Select} k="font" label="Font" options=${[['cut', 'Smult Cut (default)'], ['comic', 'Comic Sans'], ['doors', 'DOORS'], ['system', 'System font']]} />
     <${Slider} k="font_size" label="Text size" min=${12} max=${22} suffix="px" />
     <${Sec} t="Messages" /><${Select} k="message_style" label="Layout" options=${[['rows', 'Rows (Discord-ish)'], ['bubbles', 'Bubbles (WhatsApp-ish)']]} />
-    <${Check} k="compact" label="Compact spacing" /><${Check} k="show_avatars" label="Show avatars" /><${Check} k="big_emoji" label="Big emoji when a message is only emoji" /><${Check} k="drawn_icons" label="Lobby's drawn icons (instead of emoji)" onChange=${() => ctx.bus.emit('nav')} />
+    <${Check} k="compact" label="Compact spacing" /><${Check} k="show_avatars" label="Show avatars" /><${Check} k="big_emoji" label="Big emoji when a message is only emoji" /><${Check} k="drawn_icons" label="Smult's drawn icons (instead of emoji)" onChange=${() => ctx.bus.emit('nav')} />
     <${Check} k="time_24h" label="24-hour clock" /><${Check} k="show_seconds" label="Show seconds" /><${Check} k="show_edits" label="Show (edited) tag" />
     <${Check} k="show_presence_dots" label="Show online dots on avatars" /><${Check} k="animations" label="Animations" />
   </${Page}>`;
@@ -230,10 +231,10 @@ function Chat() {
 }
 
 function BrainSettings() {
-  return html`<${Page} title="The Lobby Brain">
+  return html`<${Page} title="The Smult Brain">
     <${Check} k="brain_train" label="⚡ Help train it (uses a little CPU)" onChange=${(v) => { if (v) { ctx.brain && ctx.brain.ensureLoaded(); ctx.lang && ctx.lang.ensureLoaded(); } }} />
     <${Check} k="brain_train_charging_only" label="Only train while charging" sub="Saves battery: training pauses when the phone isn't plugged in." />
-    <${Note} t="Training also pauses during calls and while Lobby is in the background." />
+    <${Note} t="Training also pauses during calls and while Smult is in the background." />
   </${Page}>`;
 }
 
@@ -252,8 +253,8 @@ function Advanced() {
       <input class="field" type="password" placeholder=${tr('Password')} value=${S.get('turn_pass')} onInput=${(e) => S.set('turn_pass', e.target.value)} /></div>
     <${Sec} t="Storage" />
     <button class="btn block" onClick=${async () => { const k = await clearFileCache(); ctx.toast(`Removed ${k} cached files`, 'ok'); }}>${tr('🧹 Clear image/file cache')}</button>
-    ${isNative ? html`<button class="btn block" style=${{ marginTop: '8px' }} onClick=${() => LobbyNative.batteryOptimizations().catch(() => {})}>${tr('🔋 Let Lobby run in the background')}</button>
-      <${Note} t="Some phones (Xiaomi, Samsung...) kill apps in the background. This opens the setting that lets Lobby keep getting messages." />` : null}
+    ${isNative ? html`<button class="btn block" style=${{ marginTop: '8px' }} onClick=${() => LobbyNative.batteryOptimizations().catch(() => {})}>${tr('🔋 Let Smult run in the background')}</button>
+      <${Note} t="Some phones (Xiaomi, Samsung...) kill apps in the background. This opens the setting that lets Smult keep getting messages." />` : null}
   </${Page}>`;
 }
 
@@ -261,8 +262,8 @@ function About() {
   return html`<${Page} title="About">
     <div class="center" style=${{ margin: '20px 0' }}><div class="emoji" style=${{ fontSize: '56px' }}>${I('🚪')}</div><b style=${{ fontSize: '1.8em', color: 'var(--accent)' }}>LOBBY</b>
       <div class="muted">for Android · v1.0</div></div>
-    <p>${tr('Lobby — made for you and your friends.')}</p>
-    <p class="small muted">${tr('Same accounts, chats, groups, calls and community brains as Lobby on PC. Peer-to-peer over Nostr relays, end-to-end encrypted, calls go directly between devices (WebRTC).')}</p>
+    <p>${tr('Smult — made for you and your friends.')}</p>
+    <p class="small muted">${tr('Same accounts, chats, groups, calls and community brains as Smult on PC. Peer-to-peer over Nostr relays, end-to-end encrypted, calls go directly between devices (WebRTC).')}</p>
     <p class="small muted">Fonts: LDF Comic Sans (freeware), Comic Neue (OFL), DOORS. Emoji: Twemoji Mozilla (OFL 1.1; artwork © Twitter, CC-BY 4.0).</p>
   </${Page}>`;
 }

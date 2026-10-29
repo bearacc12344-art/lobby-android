@@ -7,6 +7,7 @@ import { fmtShort } from '../util/format.js';
 import { ChatAvatar, Empty } from './common.js';
 import { longPress } from './press.js';
 import { CallBar } from './Call.js';
+import { StatusRow } from './Status.js';
 
 export function preview(c) {
   const st = ctx.store, m = c.last;
@@ -62,6 +63,7 @@ export function ChatList() {
       <div style=${{ padding: '10px 12px 4px' }}>
         <input class="field" placeholder=${tr('Find a chat   (Ctrl+K)').replace('   (Ctrl+K)', '')} value=${q} onInput=${(e) => setQ(e.target.value)} />
       </div>
+      ${!q && !archived ? html`<${StatusRow} />` : null}
       ${!q && st.me ? html`<div class="small muted" style=${{ padding: '2px 16px 4px' }}>${tr(greet)}, ${st.me.display}. ${st.synced ? '' : '⏳'}</div>` : null}
       ${archived ? html`<div class="item" style=${{ padding: '10px 16px', color: 'var(--accent)' }} onClick=${() => setArchived(false)}>${tr('⬅ Back to chats')}</div>` : null}
       <div class="list">

@@ -29,7 +29,7 @@ export function Main() {
   return html`<div class="screen">
     ${ctx.conn === 'reconnecting' ? html`<div class="conn" style=${{ paddingTop: 'calc(6px + env(safe-area-inset-top))' }}>${tr("⚠️  Offline — can't reach any relay, retrying... (your messages will send when it's back)")}</div>` : null}
     <div style=${{ flex: 1, position: 'relative', minHeight: 0 }}>
-      <div class="screen" style=${{ display: top ? 'none' : 'flex' }}>
+      <div class="screen tabfade" key=${'tab-' + ctx.tab} style=${{ display: top ? 'none' : 'flex' }}>
         ${ctx.tab === 'chats' ? html`<${ChatList} />` : ctx.tab === 'friends' ? html`<${Friends} />` : ctx.tab === 'brain' ? html`<${BrainHub} />`
           : ctx.tab === 'music' ? html`<${MusicScreen} />` : html`<${SettingsHome} />`}
       </div>

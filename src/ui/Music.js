@@ -81,6 +81,6 @@ export function MusicScreen() {
 
     <div class="section">${I('⚙️')} ${tr('Settings')}</div>
     <${Check} k="music_pause_in_call" label="Fade out during calls" onChange=${() => m.update()} />
-    <${Check} k="music_pause_background" label="Pause when Lobby is in the background" onChange=${() => m.update()} />
+    <${Check} k="music_pause_background" label="Pause when Smult is in the background" onChange=${() => m.update()} />
   </div></div>`;
 }

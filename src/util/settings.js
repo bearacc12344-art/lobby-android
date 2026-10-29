@@ -1,10 +1,10 @@
-// Settings (same keys as PC Lobby where they make sense), saved on the phone.
+// Settings (same keys as PC Smult where they make sense), saved on the phone.
 export const DEFAULTS = {
   username: '', token: '', remember: true,
   relays: ['wss://relay.damus.io', 'wss://nos.lol', 'wss://relay.primal.net', 'wss://offchain.pub', 'wss://nostr.mom', 'wss://relay.nostr.net'],
   turn_url: '', turn_user: '', turn_pass: '',
   language: 'auto', season: 'auto',
-  theme: 'Hotel', accent: '', drawn_icons: true, font: 'comic', font_size: 15, message_style: 'bubbles', compact: false,
+  theme: 'Hotel', accent: '', drawn_icons: true, ui_skin: 'neon', font: 'cut', font_size: 15, message_style: 'bubbles', compact: false,
   time_24h: true, show_seconds: false, show_avatars: true, big_emoji: true, animations: true, show_presence_dots: true,
   notify_desktop: true, notify_sounds: true, notify_preview: true, dnd_trusted_bypass: true,
   quiet_hours: false, quiet_from: '23:00', quiet_to: '08:00', nudges: true, vibrate: true,
@@ -32,6 +32,10 @@ class Settings {
     let saved = {};
     try { saved = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch (e) {}
     this.v = { ...structuredClone(DEFAULTS), ...saved };
+    if (!this.v.style_v17) {          // one-time switch to the new look (can be changed back in Appearance)
+      this.v.style_v17 = true; this.v.ui_skin = 'neon'; this.v.font = 'cut';
+      try { localStorage.setItem(KEY, JSON.stringify(this.v)); } catch (e) {}
+    }
     this.listeners = new Set();
     this.t = null;
   }

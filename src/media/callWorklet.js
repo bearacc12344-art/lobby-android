@@ -1,4 +1,4 @@
-// Real-time audio for calls (runs on the audio thread). Wire format identical to PC Lobby (media.py):
+// Real-time audio for calls (runs on the audio thread). Wire format identical to PC Smult (media.py):
 // packet = [rate code 0/1/2 = 16/24/48 kHz][mu-law bytes of one 20 ms frame]
 const MU = 255, LOG1P_MU = Math.log1p(MU);
 const RATE_CODES = { 0: 16000, 1: 24000, 2: 48000 };

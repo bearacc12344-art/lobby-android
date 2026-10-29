@@ -33,7 +33,7 @@ export class Store {
   }
   get myId() { return this.me ? this.me.id : 0; }
   name(uid, nick = true) {
-    if (uid === 0) return 'Lobby';
+    if (uid === 0) return 'Smult';
     const r = this.rels[uid];
     if (nick && r && r.nickname) return r.nickname;
     const u = this.users[uid];

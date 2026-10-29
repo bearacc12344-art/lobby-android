@@ -1,6 +1,6 @@
 {
   "appId": "com.lobby.chat",
-  "appName": "Lobby",
+  "appName": "Smult",
   "webDir": "dist",
   "android": {
     "allowMixedContent": true,

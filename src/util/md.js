@@ -1,4 +1,4 @@
-// Same tiny markdown as PC Lobby: **b** *i* __u__ ~~s~~ `code` ```block``` ||spoiler|| > quote, links, @mentions, :shortcodes:
+// Same tiny markdown as PC Smult: **b** *i* __u__ ~~s~~ `code` ```block``` ||spoiler|| > quote, links, @mentions, :shortcodes:
 import { S } from './settings.js';
 
 export const SHORTCODES = { ':)': '🙂', ':D': '😄', ';)': '😉', ':(': '🙁', ':P': '😛', '<3': '❤️', ':o': '😮', xD: '😆',

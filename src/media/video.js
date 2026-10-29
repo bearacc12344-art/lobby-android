@@ -1,4 +1,4 @@
-// Camera + screen capture -> JPEG/WebP frames (same as PC Lobby's CameraThread / ScreenThread), and drawing frames.
+// Camera + screen capture -> JPEG/WebP frames (same as PC Smult's CameraThread / ScreenThread), and drawing frames.
 import { S } from '../util/settings.js';
 import { isNative, LobbyNative } from '../native.js';
 import { unb64 } from '../net/crypto.js';
@@ -58,7 +58,7 @@ export class Screen {
       this.sub = await LobbyNative.addListener('screenFrame', (e) => { if (e.data) this.onFrame(unb64(e.data)); });
       this.endSub = await LobbyNative.addListener('screenStopped', () => this.onEnd && this.onEnd());
       await LobbyNative.startScreen({ fps: S.get('screen_fps'), maxHeight: S.get('screen_res'), quality: S.get('screen_quality'),
-        codec: S.get('screen_codec'), title: 'Lobby', text: 'Sharing your screen in a call' });
+        codec: S.get('screen_codec'), title: 'Smult', text: 'Sharing your screen in a call' });
       return null;
     }
     this.stream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: S.get('screen_fps') }, audio: false });

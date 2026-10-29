@@ -6,11 +6,11 @@ export const THEMES = {
   Seek: { bg: '#040404', panel: '#0b0b0b', panel2: '#121212', panel3: '#1a1a1a', border: '#262626', text: '#ececec', muted: '#8a8a8a', accent: '#d8d8d8', accent_text: '#050505', danger: '#ff4d4d', ok: '#79e07b', bubble_me: '#262626', bubble: '#161616', link: '#ffffff', mention: '#333333' },
   Rush: { bg: '#06100a', panel: '#0b1810', panel2: '#102217', panel3: '#162d1f', border: '#1f3d2a', text: '#dff5e5', muted: '#7fa58b', accent: '#58e07f', accent_text: '#03130a', danger: '#ff5d5d', ok: '#58e07f', bubble_me: '#174028', bubble: '#11261a', link: '#8ff0aa', mention: '#1d4a2e' },
   'Guiding Light': { bg: '#07101c', panel: '#0c1828', panel2: '#112136', panel3: '#172b44', border: '#21395a', text: '#e2f1ff', muted: '#86a5c4', accent: '#7fd3ff', accent_text: '#03101c', danger: '#ff6b6b', ok: '#7fe0b0', bubble_me: '#173a5c', bubble: '#122539', link: '#a8e2ff', mention: '#1d4266' },
-  'Lobby Light': { bg: '#f3ece1', panel: '#fbf7f0', panel2: '#efe6d8', panel3: '#e5d9c6', border: '#d8c8b0', text: '#2a1d12', muted: '#7b6550', accent: '#b8761c', accent_text: '#ffffff', danger: '#c0392b', ok: '#3f9a4a', bubble_me: '#f0d9b0', bubble: '#ffffff', link: '#9a5a0a', mention: '#f6dfae' },
+  'Smult Light': { bg: '#f3ece1', panel: '#fbf7f0', panel2: '#efe6d8', panel3: '#e5d9c6', border: '#d8c8b0', text: '#2a1d12', muted: '#7b6550', accent: '#b8761c', accent_text: '#ffffff', danger: '#c0392b', ok: '#3f9a4a', bubble_me: '#f0d9b0', bubble: '#ffffff', link: '#9a5a0a', mention: '#f6dfae' },
 };
 
 export function palette() {
-  const p = { ...(THEMES[S.get('theme')] || THEMES.Hotel) };
+  const p = { ...(THEMES[S.get('theme') === 'Lobby Light' ? 'Smult Light' : S.get('theme')] || THEMES.Hotel) };
   const acc = S.get('accent');
   if (acc) {
     p.accent = acc;
@@ -27,10 +27,11 @@ export function applyTheme() {
   // icon shadow: halfway between the muted text colour and the background
   const mix = (a, b) => '#' + [1, 3, 5].map((i) => Math.round((parseInt(a.slice(i, i + 2), 16) + parseInt(b.slice(i, i + 2), 16)) / 2).toString(16).padStart(2, '0')).join('');
   root.setProperty('--ico-sh', mix(p.muted, p.bg));
-  const fonts = { comic: "'LobbyComic', 'ComicNeue'", doors: "'Doors', 'ComicNeue'", system: "system-ui, 'Roboto'" };
-  root.setProperty('--font', `${fonts[S.get('font')] || fonts.comic}, 'Twemoji', 'Noto Color Emoji', sans-serif`);
+  const fonts = { cut: "'SmultCut', 'ComicNeue'", comic: "'LobbyComic', 'ComicNeue'", doors: "'Doors', 'ComicNeue'", system: "system-ui, 'Roboto'" };
+  root.setProperty('--font', `${fonts[S.get('font')] || fonts.cut}, 'Twemoji', 'Noto Color Emoji', sans-serif`);
   root.setProperty('--fs', S.get('font_size') + 'px');
   document.documentElement.classList.toggle('compact', !!S.get('compact'));
+  for (const k of ['neon', 'lux', 'clean']) document.documentElement.classList.toggle('skin-' + k, S.get('ui_skin') === k);
   document.documentElement.classList.toggle('noanim', !S.get('animations'));
   const meta = document.querySelector('meta[name=theme-color]');
   if (meta) meta.content = p.panel;

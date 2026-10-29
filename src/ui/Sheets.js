@@ -1,4 +1,7 @@
 import { html, useBus, useEffect, useRef, useState } from './h.js';
+import { StatusViewer, StatusNew } from './Status.js';
+import { prepareAvatar } from '../util/image.js';
+import { pickFiles } from '../util/files.js';
 import { I } from '../util/icons.js';
 import { ctx } from '../ctx.js';
 import { S } from '../util/settings.js';
@@ -126,6 +129,16 @@ function AdminBadgeButton({ uid, sheet }) {
   return html`<button class="btn small" onClick=${open}>${I('🏅')} ${tr('Badges')}</button>`;
 }
 
+async function pickGroupPhoto(c) {
+  const [f] = await pickFiles({ accept: 'image/*', multiple: false });
+  if (!f) return;
+  try {
+    const a = await prepareAvatar(f);
+    await ctx.api('group_update', a.kind === 'gif' ? { chat_id: c.id, pic: a.still, gif: a.data } : { chat_id: c.id, pic: a.still });
+    ctx.toast(tr('Group photo updated'), 'ok');
+  } catch (e) { if (!(e && e.name === 'Err')) ctx.toast(String(e.message || e), 'error'); }
+}
+
 function GroupSheet({ s }) {
   useBus(['store'], (ev, t) => ['chat', 'user', 'init'].includes(t));
   const st = ctx.store;
@@ -155,6 +168,8 @@ function GroupSheet({ s }) {
       <input class="field" placeholder=${tr('Group name')} value=${name} onInput=${(e) => setName(e.target.value)} />
       <div class="row"><input class="field" style=${{ width: '80px' }} placeholder=${tr('Icon emoji')} value=${icon} onInput=${(e) => setIcon(e.target.value)} />
         <input class="field grow" placeholder=${tr('Topic')} value=${topic} onInput=${(e) => setTopic(e.target.value)} /></div>
+      <div class="row wrap"><button class="btn" onClick=${() => pickGroupPhoto(c)}>${I('🖼')} ${tr('Change group photo')}</button>
+        ${c.pic || c.pic_url ? html`<button class="btn" onClick=${() => ctx.api('group_update', { chat_id: c.id, pic: '' })}>${tr('Remove photo')}</button>` : null}</div>
       <button class="btn primary" onClick=${() => ctx.api('group_update', { chat_id: c.id, name, icon, topic }).then(() => ctx.toast('Saved', 'ok'))}>${tr('Save changes')}</button></div>` : null}
     <div class="section">${tr(`${c.members.length} members`)}</div>
     ${c.members.map((m) => html`<div class="row" style=${{ padding: '6px 0' }} onClick=${() => memberMenu(m)}>
@@ -275,6 +290,7 @@ export function Sheets() {
   useBus(['nav']);
   return html`${ctx.sheets.map((s, i) => {
     if (s.kind === 'image') return html`<${ImageViewer} s=${s} key=${i} />`;
+    if (s.kind === 'status') return html`<${StatusViewer} s=${s} key=${i} />`;
     if (s.kind === 'grant' || s.kind === 'incoming') return null;
     const mid = s.kind === 'confirm' || s.kind === 'prompt';
     let inner;
@@ -291,6 +307,7 @@ export function Sheets() {
     else if (s.kind === 'forward') inner = html`<${ForwardSheet} s=${s} />`;
     else if (s.kind === 'pins') inner = html`<${PinsSheet} s=${s} />`;
     else if (s.kind === 'media') inner = html`<${MediaSheet} s=${s} />`;
+    else if (s.kind === 'status-new') inner = html`<${StatusNew} s=${s} />`;
     else if (s.render) inner = s.render(s);
     const cancel = () => { ctx.closeSheet(s); if (s.res) s.res(s.kind === 'confirm' ? false : null); };
     return html`<div class=${'backdrop' + (mid ? ' mid' : '')} key=${i} onClick=${(e) => e.target === e.currentTarget && cancel()}>

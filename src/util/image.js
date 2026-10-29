@@ -1,4 +1,4 @@
-// picture helpers: profile pictures (same format as PC Lobby: 160 px JPEG still, GIFs kept animated), thumbnails
+// picture helpers: profile pictures (same format as PC Smult: 160 px JPEG still, GIFs kept animated), thumbnails
 import { b64 } from '../net/crypto.js';
 
 export function loadImage(src) {

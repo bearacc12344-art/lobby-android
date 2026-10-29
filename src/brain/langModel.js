@@ -1,4 +1,4 @@
-// The Lobby Brain's language half - exact JS port of lang_model.py (same weights, same int8 sharing format).
+// The Smult Brain's language half - exact JS port of lang_model.py (same weights, same int8 sharing format).
 //   12 chars -> embeddings (12 x 12) -> 144 -> hidden 128 (tanh) -> one score per character -> softmax
 import pako from 'pako';
 import { b64, unb64 } from './visionModel.js';

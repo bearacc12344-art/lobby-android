@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Lobby</string>
-    <string name="title_activity_main">Lobby</string>
+    <string name="app_name">Smult</string>
+    <string name="title_activity_main">Smult</string>
     <string name="package_name">com.lobby.chat</string>
     <string name="custom_url_scheme">com.lobby.chat</string>
 </resources>
