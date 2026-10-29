@@ -49,18 +49,18 @@ jobs:
           grep -E "error:|e: |What went wrong|Could not|FAILED|Execution failed" -A3 gradle.log | head -60 | while IFS= read -r l; do echo "::error::$l"; done || true
 
       - name: Rename
-        run: cp android/app/build/outputs/apk/release/app-release.apk Lobby.apk
+        run: cp android/app/build/outputs/apk/release/app-release.apk Smult.apk
 
       - uses: actions/upload-artifact@v4
         with:
-          name: Lobby-apk
-          path: Lobby.apk
+          name: Smult-apk
+          path: Smult.apk
 
       - name: Publish as a release (direct download link for phones)
         uses: softprops/action-gh-release@v2
         with:
           tag_name: build-${{ github.run_number }}
           name: Lobby for Android (build ${{ github.run_number }})
-          body: Tap **Lobby.apk** below to download, then open it to install (allow "install unknown apps" if asked).
-          files: Lobby.apk
+          body: Tap **Smult.apk** below to download, then open it to install (allow "install unknown apps" if asked).
+          files: Smult.apk
           make_latest: true
