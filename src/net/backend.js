@@ -1,6 +1,6 @@
 // Lobby P2P backend - a faithful JavaScript port of p2p.py's Backend, so phones and PCs share the same chats,
 // friends, groups, calls and community brains. No server: Nostr relays carry signed, end-to-end encrypted events.
-import { Keys, enc, dec, encBytes, decBytes, b64, unb64, hex, randBytes, sha256hex, te } from './crypto.js';
+import { Keys, enc, dec, encBytes, decBytes, encPart, decPart, b64, unb64, hex, randBytes, sha256hex, te } from './crypto.js';
 import { RelayPool } from './relay.js';
 import { LocalDB } from './db.js';
 import { idb } from './idb.js';
@@ -9,14 +9,15 @@ import { httpGet, httpPost } from './http.js';
 
 export const DEFAULT_RELAYS = ['wss://relay.damus.io', 'wss://nos.lol', 'wss://relay.primal.net', 'wss://offchain.pub',
   'wss://nostr.mom', 'wss://relay.nostr.net'];
-const BLOSSOM = ['https://blossom.nostr.build', 'https://blossom.primal.net', 'https://nostr.download'];
+const BLOSSOM = globalThis.LOBBY_BLOSSOM || ['https://blossom.nostr.build', 'https://blossom.primal.net', 'https://nostr.download'];
 const STUN = ['stun:stun.l.google.com:19302', 'stun:stun.cloudflare.com:3478'];
 
 export const K_DIRECT = 4444, K_GROUP = 4445, K_EPH = 24444, K_GEPH = 24445, K_REPL = 30078, K_AUTH = 24242;
 export const K_BRAIN = 4446, K_LANG = 4447;
 export const D_PROFILE = 'lobby-profile', D_STATE = 'lobby-state', D_BRAIN = 'lobby-brain-ckpt', D_LANG = 'lobby-lang-ckpt';
 const LANG_CHUNK_MAX = 8000;
-export const MAX_FILE = 100 * 1024 * 1024;
+export const MAX_FILE = 200 * 1024 * 1024;
+const PART = 8 * 1024 * 1024, PARTS_OVER = 20 * 1024 * 1024, PAR = 4;   // big files: parallel 8 MB parts (same as PC)
 const INLINE_MAX = 32 * 1024;
 const ONLINE_WINDOW = 100;
 const RING_TIMEOUT = 45;
@@ -848,7 +849,7 @@ export class Backend {
       if (!['text', 'image', 'file', 'voice', 'poll', 'system', 'call', 'nudge'].includes(kind)) kind = 'text';
       const file = pl.file && typeof pl.file === 'object' ? pl.file : null;
       let fid = null;
-      if (file) fid = sha256hex(te.encode(String(file.url || file.inline || '').slice(0, 4096) + String(file.k || ''))).slice(0, 32);
+      if (file) fid = sha256hex(te.encode(String(file.url || file.inline || (Array.isArray(file.parts) ? file.parts[0] || '' : '')).slice(0, 4096) + String(file.k || ''))).slice(0, 32);
       const created = Math.floor(mid / 4096) / 1000;
       const shown = created <= now() + 5 ? 1 : 0;
       const reply = pl.reply_to;
@@ -1267,17 +1268,20 @@ export class Backend {
     }
     return c;
   }
-  async upload(blob) {
+  async upload(blob, first = 0) {
     const sha = sha256hex(blob);
     const errors = [];
-    for (const server of BLOSSOM) {
+    let servers = [...BLOSSOM];
+    if (this.goodHost && servers.includes(this.goodHost)) servers = [this.goodHost, ...servers.filter((x) => x !== this.goodHost)];
+    if (first) servers = [...servers.slice(first % servers.length), ...servers.slice(0, first % servers.length)];
+    for (const server of servers) {
       const auth = this.k.sign(K_AUTH, [['t', 'upload'], ['x', sha], ['expiration', String(Math.floor(now()) + 600)]], 'Upload file');
       try {
         const r = await fetch(server + '/upload', { method: 'PUT', body: blob,
           headers: { Authorization: 'Nostr ' + btoa(JSON.stringify(auth)), 'Content-Type': 'application/octet-stream', 'X-SHA-256': sha } });
         if (!r.ok) throw new Error('HTTP ' + r.status);
         const res = await r.json();
-        if (res.url) return res.url;
+        if (res.url) { this.goodHost = server; return res.url; }
       } catch (e) { errors.push(`${server}: ${e.message || e}`); }
     }
     try {   // last resort: catbox.moe (anonymous). The blob is encrypted so they can't see anything.
@@ -1299,11 +1303,22 @@ export class Backend {
       const raw = d.file.bytes || unb64(d.file.data);
       if (raw.length > MAX_FILE) throw new Err(`File too big (max ${MAX_FILE / 1024 / 1024} MB)`);
       const fkey = randBytes(32);
-      const blob = await encBytes(fkey, raw);
       const fname = basename(d.file.name || 'file').slice(0, 120);
       const meta = { name: fname, size: raw.length, k: b64(fkey) };
-      if (raw.length <= INLINE_MAX) meta.inline = b64(blob);
-      else meta.url = await this.upload(blob);
+      const tid = d.file.tid || hex(randBytes(4));
+      if (raw.length > PARTS_OVER) {
+        meta.parts = await this.uploadParts(raw, fkey, fname, tid);
+        meta.psize = PART;
+      } else {
+        const blob = await encBytes(fkey, raw);
+        if (raw.length <= INLINE_MAX) meta.inline = b64(blob);
+        else {
+          const t0 = Date.now();
+          this.transfer('up', fname, 0, raw.length, t0, tid);
+          meta.url = await this.upload(blob);
+          this.transfer('up', fname, raw.length, raw.length, t0, tid);
+        }
+      }
       pl.file = meta;
       pl.kind = d.file.voice ? 'voice' : IMAGE_EXT.has(ext(fname)) ? 'image' : 'file';
     } else if (d.poll) {
@@ -1425,10 +1440,53 @@ export class Backend {
     return this.q('SELECT * FROM messages WHERE chat_id=? AND shown=1 AND file IS NOT NULL ORDER BY id DESC LIMIT 200', parseInt(d.chat_id, 10))
       .map((r) => this.msgView(r)).filter((v) => !v.deleted);
   }
+  transfer(kind, name, done, total, t0, id) {
+    const el = Math.max(0.001, (Date.now() - t0) / 1000);
+    this.emit({ t: 'transfer', id, kind, name, done, total, speed: done / el, finished: done >= total });
+  }
+  async pool4(n, fn) {
+    let next = 0;
+    const worker = async () => { while (next < n) { const i = next++; await fn(i); } };
+    await Promise.all(Array.from({ length: Math.min(PAR, n) }, worker));
+  }
+  async uploadParts(raw, fkey, name, tid) {
+    const n = Math.ceil(raw.length / PART);
+    const urls = new Array(n);
+    let sent = 0, last = 0;
+    const t0 = Date.now();
+    this.transfer('up', name, 0, raw.length, t0, tid);
+    await this.pool4(n, async (i) => {
+      const chunk = raw.subarray(i * PART, (i + 1) * PART);
+      urls[i] = await this.upload(await encPart(fkey, chunk, i), i);
+      sent += chunk.length;
+      if (Date.now() - last > 400 || sent >= raw.length) { last = Date.now(); this.transfer('up', name, sent, raw.length, t0, tid); }
+    });
+    return urls;
+  }
   async on_get_file(d) {
     const m = this.q1('SELECT file FROM messages WHERE fid=?', String(d.file_id || ''));
     if (!m) throw new Err('File not found');
     const meta = JSON.parse(m.file);
+    if (Array.isArray(meta.parts) && meta.parts.length) {
+      const key = unb64(meta.k), size = meta.size || 0, out = new Array(meta.parts.length);
+      const t0 = Date.now(), tid = 'dl' + String(d.file_id).slice(0, 8);
+      let got = 0, last = 0;
+      this.transfer('down', meta.name || 'file', 0, size || 1, t0, tid);
+      await this.pool4(meta.parts.length, async (i) => {
+        let blob, err;
+        for (let a = 0; a < 3 && !blob; a++) {
+          try { blob = await httpGet(meta.parts[i]); } catch (e) { err = e; await new Promise((r) => setTimeout(r, 1000 * (a + 1))); }
+        }
+        if (!blob) throw new Err('Download failed: ' + ((err && err.message) || err));
+        try { out[i] = await decPart(key, blob, i); } catch (e) { throw new Err('File is corrupted'); }
+        got += out[i].length;
+        if (Date.now() - last > 400 || got >= size) { last = Date.now(); this.transfer('down', meta.name || 'file', got, size || got, t0, tid); }
+      });
+      const raw = new Uint8Array(got);
+      let o = 0;
+      for (const p of out) { raw.set(p, o); o += p.length; }
+      return { name: meta.name || 'file', bytes: raw };
+    }
     let blob;
     if (meta.inline) blob = unb64(meta.inline);
     else {

@@ -545,6 +545,7 @@ export function ChatView({ cid, jump }) {
       ${seen ? html`<div class="seen">${seen}</div>` : null}
     </div>
     <div class="typing">${typing.length ? sub : ''}</div>
+    <${TransferBar} />
     <${Composer} chat=${chat} reply=${reply} setReply=${setReply} edit=${edit} setEdit=${setEdit} onSent=${() => { stick.current = true; }} key=${cid} />
   </div>`;
 }
@@ -564,4 +565,17 @@ function SearchBar({ cid, s, set, onPick }) {
       <div class="small"><b>${st.name(m.sender)}</b> <span class="muted">${dayLabel(m.created)} ${fmtTime(m.created)}</span></div>
       <div class="ellipsis">${m.body || (m.file || {}).name}</div></div>`) : html`<div class="pad muted">${tr('No results 👀')}</div>`) : null}
   </div>`;
+}
+
+// ⬆/⬇ progress for big files (parts go up/down in parallel)
+function TransferBar() {
+  useBus(['transfer']);
+  const live = Object.values(ctx.transfers).filter((x) => !x.finished);
+  if (!live.length) return null;
+  const done = live.reduce((a, x) => a + x.done, 0), total = live.reduce((a, x) => a + x.total, 0) || 1;
+  const speed = live.reduce((a, x) => a + x.speed, 0);
+  const left = speed > 1 ? (total - done) / speed : 0;
+  const names = live.slice(0, 2).map((x) => (x.kind === 'up' ? '⬆ ' : '⬇ ') + x.name).join(', ') + (live.length > 2 ? ` +${live.length - 2}` : '');
+  return html`<div style=${{ padding: '4px 14px 0' }}><div class="small muted ellipsis">${names} — ${Math.floor(done * 100 / total)}% · ${fmtSize(speed)}/s${left >= 1 ? ` · ${Math.round(left)}s` : ''}</div>
+    <div class="progress" style=${{ height: '5px', marginTop: '3px' }}><i style=${{ width: (done * 100 / total) + '%' }}></i></div></div>`;
 }

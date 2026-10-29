@@ -66,6 +66,18 @@ async function aesKey(raw) {
   return key;
 }
 
+// one big-file part: nonce + AES-GCM(data) with the part number as additional data (same as PC upload_parts)
+export async function encPart(keyRaw, data, i) {
+  const key = await crypto.subtle.importKey('raw', keyRaw, 'AES-GCM', false, ['encrypt']);
+  const n = randBytes(12);
+  const ad = new Uint8Array([i >>> 24, (i >>> 16) & 255, (i >>> 8) & 255, i & 255]);
+  return concat(n, new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv: n, additionalData: ad }, key, data)));
+}
+export async function decPart(keyRaw, blob, i) {
+  const key = await crypto.subtle.importKey('raw', keyRaw, 'AES-GCM', false, ['decrypt']);
+  const ad = new Uint8Array([i >>> 24, (i >>> 16) & 255, (i >>> 8) & 255, i & 255]);
+  return new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: blob.subarray(0, 12), additionalData: ad }, key, blob.subarray(12)));
+}
 export async function encBytes(keyRaw, data) {
   const n = randBytes(12);
   const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv: n }, await aesKey(keyRaw), data));

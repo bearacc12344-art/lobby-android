@@ -31,6 +31,7 @@ export const ctx = {
   brain: null,
   lang: null,
   music: null,
+  transfers: {},          // big file uploads/downloads in progress
 };
 
 let toastId = 0;
@@ -165,6 +166,12 @@ ctx.net.on((d) => {
   else if (t === 'brain_ckpt' && ctx.brain) ctx.brain.mergeRemote(d.author, d.content, d.created);
   else if (t === 'lang_txt' && ctx.lang) ctx.lang.addChunk(d.chunk);
   else if (t === 'lang_ckpt' && ctx.lang) ctx.lang.mergeRemote(d.author, d.content, d.created);
+  else if (t === 'transfer') {
+    ctx.transfers[d.id] = d;
+    if (d.finished) setTimeout(() => { delete ctx.transfers[d.id]; ctx.bus.emit('transfer'); }, 1500);
+    ctx.bus.emit('transfer');
+    return;
+  }
   ctx.bus.emit('store', t, d);
 });
 ctx.net.onMedia((uid, kind, bytes) => { if (ctx.call) ctx.call.onMedia(uid, kind, bytes); });
