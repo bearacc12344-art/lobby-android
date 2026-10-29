@@ -6,11 +6,17 @@ export const THEMES = {
   Seek: { bg: '#040404', panel: '#0b0b0b', panel2: '#121212', panel3: '#1a1a1a', border: '#262626', text: '#ececec', muted: '#8a8a8a', accent: '#d8d8d8', accent_text: '#050505', danger: '#ff4d4d', ok: '#79e07b', bubble_me: '#262626', bubble: '#161616', link: '#ffffff', mention: '#333333' },
   Rush: { bg: '#06100a', panel: '#0b1810', panel2: '#102217', panel3: '#162d1f', border: '#1f3d2a', text: '#dff5e5', muted: '#7fa58b', accent: '#58e07f', accent_text: '#03130a', danger: '#ff5d5d', ok: '#58e07f', bubble_me: '#174028', bubble: '#11261a', link: '#8ff0aa', mention: '#1d4a2e' },
   'Guiding Light': { bg: '#07101c', panel: '#0c1828', panel2: '#112136', panel3: '#172b44', border: '#21395a', text: '#e2f1ff', muted: '#86a5c4', accent: '#7fd3ff', accent_text: '#03101c', danger: '#ff6b6b', ok: '#7fe0b0', bubble_me: '#173a5c', bubble: '#122539', link: '#a8e2ff', mention: '#1d4266' },
+  'Neon Glass': { bg: '#07061a', panel: '#0c0a24', panel2: '#14113a', panel3: '#1d1950', border: '#2b2566', text: '#eef0ff', muted: '#9a97cc', accent: '#29e0ff', accent2: '#b44dff', accent_text: '#04121a', danger: '#ff4d7a', ok: '#3dffa8', bubble_me: '#3a1e6e', bubble: '#17143f', link: '#7cf3ff', mention: '#2a1f66' },
   'Smult Light': { bg: '#f3ece1', panel: '#fbf7f0', panel2: '#efe6d8', panel3: '#e5d9c6', border: '#d8c8b0', text: '#2a1d12', muted: '#7b6550', accent: '#b8761c', accent_text: '#ffffff', danger: '#c0392b', ok: '#3f9a4a', bubble_me: '#f0d9b0', bubble: '#ffffff', link: '#9a5a0a', mention: '#f6dfae' },
 };
 
+export const PALETTE_KEYS = ['bg', 'panel', 'panel2', 'panel3', 'border', 'text', 'muted', 'accent', 'accent2', 'accent_text', 'danger', 'ok', 'bubble_me', 'bubble', 'link', 'mention'];
+
 export function palette() {
-  const p = { ...(THEMES[S.get('theme') === 'Lobby Light' ? 'Smult Light' : S.get('theme')] || THEMES.Hotel) };
+  const name = S.get('theme') === 'Lobby Light' ? 'Smult Light' : S.get('theme');
+  const custom = (S.get('custom_themes') || {})[name];
+  if (custom) return { ...THEMES['Neon Glass'], ...Object.fromEntries(Object.entries(custom).filter(([k, v]) => PALETTE_KEYS.includes(k) && /^#[0-9a-f]{3,8}$/i.test(v))) };
+  const p = { ...(THEMES[name] || THEMES.Hotel) };
   const acc = S.get('accent');
   if (acc) {
     p.accent = acc;
@@ -24,6 +30,9 @@ export function applyTheme() {
   const p = palette();
   const root = document.documentElement.style;
   for (const [k, v] of Object.entries(p)) root.setProperty('--' + k.replace('_', '-'), v);
+  root.setProperty('--g1', p.accent);
+  root.setProperty('--g2', p.accent2 || p.accent);
+  applyBackground();
   // icon shadow: halfway between the muted text colour and the background
   const mix = (a, b) => '#' + [1, 3, 5].map((i) => Math.round((parseInt(a.slice(i, i + 2), 16) + parseInt(b.slice(i, i + 2), 16)) / 2).toString(16).padStart(2, '0')).join('');
   root.setProperty('--ico-sh', mix(p.muted, p.bg));
@@ -35,4 +44,40 @@ export function applyTheme() {
   document.documentElement.classList.toggle('noanim', !S.get('animations'));
   const meta = document.querySelector('meta[name=theme-color]');
   if (meta) meta.content = p.panel;
+}
+
+
+// ---------------------------------------------------------------- picture / GIF backgrounds (Settings → Themes)
+let bgUrl = '', bgKey = '';
+export async function applyBackground() {
+  const on = S.get('bg_mode') === 'image' && S.get('bg_key');
+  let layer = document.getElementById('bgLayer');
+  if (!layer) {
+    layer = document.createElement('div');
+    layer.id = 'bgLayer';
+    layer.innerHTML = '<i class="pic"></i><i class="tint"></i>';
+    document.body.prepend(layer);
+  }
+  document.documentElement.classList.toggle('has-bg', !!on);
+  const root = document.documentElement.style;
+  root.setProperty('--glass-a', String(Math.max(0.2, Math.min(1, (S.get('glass_opacity') ?? 78) / 100))));
+  if (!on) { layer.style.display = 'none'; return; }
+  layer.style.display = '';
+  const pic = layer.querySelector('.pic'), tint = layer.querySelector('.tint');
+  pic.style.opacity = String((S.get('bg_opacity') ?? 60) / 100);
+  pic.style.filter = S.get('bg_blur') ? `blur(${S.get('bg_blur')}px)` : '';
+  tint.style.opacity = String((S.get('bg_tint') ?? 25) / 100);
+  const key = S.get('bg_key');
+  if (key !== bgKey) {
+    bgKey = key;
+    try {
+      const { idb } = await import('../net/idb.js');
+      const rec = await idb.get('kv', key);
+      if (rec) {
+        if (bgUrl) URL.revokeObjectURL(bgUrl);
+        bgUrl = URL.createObjectURL(new Blob([rec.bytes || rec], { type: rec.mime || 'image/gif' }));
+        pic.style.backgroundImage = `url("${bgUrl}")`;
+      }
+    } catch (e) { console.warn('background', e); }
+  }
 }

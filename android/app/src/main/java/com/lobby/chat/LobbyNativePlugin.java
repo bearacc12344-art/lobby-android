@@ -334,6 +334,7 @@ public class LobbyNativePlugin extends Plugin {
         ScreenCapture.maxHeight = call.getInt("maxHeight", 720);
         ScreenCapture.quality = call.getInt("quality", 70);
         ScreenCapture.webp = "webp".equals(call.getString("codec", "jpg"));
+        ScreenCapture.audio = call.getBoolean("audio", true);
         MediaProjectionManager mpm = (MediaProjectionManager) getContext().getSystemService(Context.MEDIA_PROJECTION_SERVICE);
         startActivityForResult(call, mpm.createScreenCaptureIntent(), "screenResult");
     }

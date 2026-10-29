@@ -80,7 +80,7 @@ function Filters({ W }) {
 function Board({ contrib, score, line }) {
   const rows = Object.values(contrib || {}).sort((a, b) => score(b) - score(a)).slice(0, 8);
   if (!rows.length) return html`<div class="muted">${tr('nobody yet. be the first!')}</div>`;
-  return html`<div>${rows.map((c, i) => html`<div style=${{ padding: '3px 0' }}><span class="emoji">${MEDALS[i] || '▫️'}</span> <b>${c.name || tr('someone')}</b> <span class="muted small">— ${line(c)}</span></div>`)}</div>`;
+  return html`<div>${rows.map((c, i) => html`<div style=${{ padding: '3px 0' }}><span class="emoji">${MEDALS[i] || '·'}</span> <b>${c.name || tr('someone')}</b> <span class="muted small">— ${line(c)}</span></div>`)}</div>`;
 }
 
 // ===================================================================== drawing pad

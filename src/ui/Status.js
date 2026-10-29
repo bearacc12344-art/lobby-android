@@ -127,8 +127,8 @@ export function StatusViewer({ s }) {
     <div class="st-card" key=${it.id} style=${it.kind === 'image' ? { background: '#000' } : { background: `linear-gradient(135deg, ${bg}, ${shade(bg, -0.45)})` }}
       onClick=${tap} onPointerDown=${() => setPaused(true)} onPointerUp=${() => setPaused(false)}>
       ${it.kind === 'image' ? (src && src !== 'loading' ? html`<img src=${src} />` : html`<div class="st-load muted">${tr('loading photo…')}</div>`)
-        : html`<div class="st-text" style=${{ color: light(bg) ? '#111' : '#fff', fontSize: it.text.length < 80 ? '2em' : '1.4em' }}>${it.text}</div>`}
-      ${it.kind === 'image' && it.text ? html`<div class="st-cap">${it.text}</div>` : null}
+        : html`<div class="st-text" data-raw=${1} style=${{ color: light(bg) ? '#111' : '#fff', fontSize: it.text.length < 80 ? '2em' : '1.4em' }}>${it.text}</div>`}
+      ${it.kind === 'image' && it.text ? html`<div class="st-cap" data-raw=${1}>${it.text}</div>` : null}
     </div>
     <div class="st-bars">${g.items.map((x, i) => html`<div class="st-bar"><i ref=${i === ii ? bar : null} style=${{ width: i < ii ? '100%' : i > ii ? '0%' : undefined }}></i></div>`)}</div>
     <div class="st-head"><${Avatar} user=${u} size=${38} presence=${false} />
@@ -191,8 +191,8 @@ export function StatusNew({ s }) {
   return html`<div class="col">
     <b style=${{ fontSize: '1.2em' }}>${tr('New status')}</b>
     <div class="st-prev" style=${photo ? { background: '#000' } : { background: `linear-gradient(135deg, ${bg}, ${shade(bg, -0.45)})` }}>
-      ${photo ? html`<img src=${photo.url} />${text ? html`<div class="st-cap">${text}</div>` : null}`
-        : html`<div class="st-text" style=${{ color: light(bg) ? '#111' : '#fff' }}>${text || tr('Type something…')}</div>`}
+      ${photo ? html`<img src=${photo.url} />${text ? html`<div class="st-cap" data-raw=${1}>${text}</div>` : null}`
+        : html`<div class="st-text" data-raw=${1} style=${{ color: light(bg) ? '#111' : '#fff' }}>${text || tr('Type something…')}</div>`}
     </div>
     <textarea class="field" rows="3" placeholder=${tr("What's going on? (disappears after 24 h)")} value=${text} onInput=${(e) => setText(e.target.value)}></textarea>
     ${!photo ? html`<div class="row wrap" style=${{ gap: '8px' }}>${BGS.map((c) => html`<span class=${'st-swatch' + (c === bg ? ' on' : '')} style=${{ background: c }} onClick=${() => setBg(c)}></span>`)}</div>` : null}

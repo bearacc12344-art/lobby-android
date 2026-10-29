@@ -159,7 +159,7 @@ function Message({ m, prev, chat, onMenu, highlight, isLast }) {
       ${m.reply ? html`<div class="reply" onClick=${() => ctx.bus.emit('jump', m.reply.id)}><b>${st.name(m.reply.sender)}</b> <span class="muted">${m.reply.body}</span></div>` : null}
       ${body}
       ${reacts.length ? html`<div class="reacts">${reacts.map(([e, us]) => html`<span class=${'react' + (us.includes(st.myId) ? ' mine' : '')}
-        onClick=${(ev) => { ev.stopPropagation(); ctx.api('react', { msg_id: m.id, emoji: e }); }}><span class="emoji">${e}</span> ${us.length}</span>`)}</div>` : null}
+        onClick=${(ev) => { ev.stopPropagation(); ctx.api('react', { msg_id: m.id, emoji: e }); }}><span class="emoji" data-raw=${1}>${e}</span> ${us.length}</span>`)}</div>` : null}
       ${rows ? (m.edited && S.get('show_edits') ? html`<span class="tiny muted">${tr('(edited)')}</span>` : null)
         : html`<span class="time">${m.silent ? '🤫 ' : ''}${m.edited && S.get('show_edits') ? tr('(edited)') + ' ' : ''}${fmtTime(m.created)}${mine && isLast ? '' : ''}</span>`}
     </div></div>`;

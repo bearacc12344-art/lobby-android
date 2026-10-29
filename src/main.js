@@ -1,3 +1,4 @@
+import { AppLogo } from './util/logo.js';
 import './styles.css';
 import './skins.css';
 import { render } from 'preact';
@@ -25,14 +26,14 @@ function App({ booting }) {
   useBus(['auth']);
   const [boot, setBoot] = useState(booting);
   useEffect(() => { if (booting) ctx.resume().finally(() => setBoot(false)); }, []);
-  if (boot) return html`<div class="screen" style=${{ alignItems: 'center', justifyContent: 'center' }}><img src="./assets/smult.png" class="applogo" style=${{ width: '96px', height: '96px' }} />
+  if (boot) return html`<div class="screen" style=${{ alignItems: 'center', justifyContent: 'center' }}><${AppLogo} size=${96} />
     <div class="muted" style=${{ marginTop: '12px' }}>Smult…</div></div>`;
   return html`${ctx.authed ? html`<${Main} />` : html`<${Login} />`}<${Toasts} /><${Banner} />`;
 }
 
 (async () => {
   applyTheme();
-  S.on((k) => { if (['theme', 'accent', 'font', 'font_size', 'compact', 'animations', 'ui_skin'].includes(k)) applyTheme(); });
+  S.on((k) => { if (['theme', 'accent', 'font', 'font_size', 'compact', 'animations', 'ui_skin', 'custom_themes', 'bg_mode', 'bg_key', 'bg_opacity', 'bg_blur', 'bg_tint', 'glass_opacity'].includes(k)) applyTheme(); });
   await loadI18n();
   initNative();
   import('./music.js').then((mm) => { ctx.music = new mm.Music(ctx); }).catch((e) => console.warn('music', e));

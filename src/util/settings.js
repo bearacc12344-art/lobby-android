@@ -16,11 +16,11 @@ export const DEFAULTS = {
   mic_gain: 100, out_volume: 100, gate_db: -50, voice_quality: 24000, highpass: true, join_muted: false,
   auto_answer_trusted: false, user_volumes: {}, ring_volume: 70, speaker: true, echo_cancel: true,
   cam_res: 360, cam_fps: 12, cam_quality: 70, mirror: true, cam_facing: 'user',
-  screen_res: 720, screen_fps: 8, screen_quality: 70, screen_codec: 'jpg',
+  screen_res: 720, screen_fps: 8, screen_quality: 70, screen_codec: 'jpg', screen_audio: true,
   sounds: [], sound_volume: 80, sound_cooldown: 1.0,
   idle_minutes: 10, confirm_leave_call: false, streamer_mode: false,
   music: true, music_volume: 30, music_pause_in_call: true, music_pause_background: true, music_file: '',
-  music_library: [], music_mode: 'loop', music_builtin_hidden: false,
+  music_library: [], playlists: [], music_playlist: '', custom_themes: {}, bg_mode: 'theme', bg_key: '', bg_opacity: 60, bg_blur: 0, bg_tint: 25, glass_opacity: 78, music_mode: 'loop', music_builtin_hidden: false,
   brain_train: false, brain_train_charging_only: false,
   gif_provider: 'auto', gif_key: '', autoplay_gifs: true,
 };
@@ -34,6 +34,11 @@ class Settings {
     this.v = { ...structuredClone(DEFAULTS), ...saved };
     if (!this.v.style_v17) {          // one-time switch to the new look (can be changed back in Appearance)
       this.v.style_v17 = true; this.v.ui_skin = 'neon'; this.v.font = 'cut';
+      try { localStorage.setItem(KEY, JSON.stringify(this.v)); } catch (e) {}
+    }
+    if (!this.v.style_v18) {          // Smult 18: Neon Glass is a real theme now (the colours, not just the style)
+      this.v.style_v18 = true;
+      if (!this.v.theme || this.v.theme === 'Hotel') this.v.theme = 'Neon Glass';
       try { localStorage.setItem(KEY, JSON.stringify(this.v)); } catch (e) {}
     }
     this.listeners = new Set();

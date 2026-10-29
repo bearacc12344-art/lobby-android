@@ -15,7 +15,7 @@ import { GifPicker } from './Gifs.js';
 function Menu({ s }) {
   return html`<div class="menu">${s.title ? html`<div class="muted small" style=${{ padding: '2px 6px 8px' }}>${s.title}</div>` : null}
     ${s.items.filter(Boolean).map((it) => it.row ? html`<div class="row" style=${{ justifyContent: 'space-between', padding: '4px 2px 10px' }}>
-        ${it.row.map((e) => html`<button class="iconbtn" style=${{ fontSize: '1.6em' }} onClick=${() => { ctx.closeSheet(s); it.fn(e); }}>${e}</button>`)}</div>`
+        ${it.row.map((e) => html`<button class="iconbtn" data-raw=${1} style=${{ fontSize: '1.6em' }} onClick=${() => { ctx.closeSheet(s); it.fn(e); }}>${e}</button>`)}</div>`
       : html`<div class=${'mi' + (it.danger ? ' danger' : '')} onClick=${() => { ctx.closeSheet(s); it.fn && it.fn(); }}>
         <span class="ic">${I(it.ic || '')}</span><span class="grow">${tr(it.label)}</span>${it.right || ''}</div>`)}</div>`;
 }
@@ -51,10 +51,10 @@ function EmojiSheet({ s }) {
     <div class="row" style=${{ padding: '10px 12px 4px' }}><input class="field" placeholder=${tr('Search  (try skull, fire, door...)')} value=${q} onInput=${(e) => setQ(e.target.value)} />
       <button class="iconbtn" onClick=${() => ctx.closeSheet(s)}>${I('✖️')}</button></div>
     <div style=${{ overflowY: 'auto', flex: 1 }}>
-      ${shown ? html`<div class="egrid">${shown.map((e) => html`<button onClick=${() => pick(e)}>${e}</button>`)}</div>` : html`
-        ${recent.length ? html`<div class="section" style=${{ margin: '8px 12px 0' }}>${tr('Recent')}</div><div class="egrid">${recent.map((e) => html`<button onClick=${() => pick(e)}>${e}</button>`)}</div>` : null}
+      ${shown ? html`<div class="egrid">${shown.map((e) => html`<button data-raw=${1} onClick=${() => pick(e)}>${e}</button>`)}</div>` : html`
+        ${recent.length ? html`<div class="section" style=${{ margin: '8px 12px 0' }}>${tr('Recent')}</div><div class="egrid">${recent.map((e) => html`<button data-raw=${1} onClick=${() => pick(e)}>${e}</button>`)}</div>` : null}
         ${Object.entries(EMOJI).map(([cat, list]) => html`<div class="section" style=${{ margin: '8px 12px 0' }}>${tr(cat)}</div>
-          <div class="egrid">${list.map((e) => html`<button onClick=${() => pick(e)}>${e}</button>`)}</div>`)}`}
+          <div class="egrid">${list.map((e) => html`<button data-raw=${1} onClick=${() => pick(e)}>${e}</button>`)}</div>`)}`}
     </div></div>`;
 }
 

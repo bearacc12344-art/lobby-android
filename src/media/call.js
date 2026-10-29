@@ -40,6 +40,7 @@ export class CallSession {
   }
   onMedia(uid, kind, bytes) {
     if (kind === 1) { this.audio.receive(uid, bytes); return; }
+    if (kind === 4) { this.audio.receive('s' + uid, bytes); return; }      // the sound of their shared screen
     decodeFrame(bytes).then((bmp) => {
       if (!bmp) return;
       const k = `${uid}:${kind}`;
@@ -115,7 +116,7 @@ export class CallSession {
   }
   async startScreen() {
     try {
-      this.screen = new Screen((f) => this.ctx.net.sendMedia(3, f), () => this.stopScreen());
+      this.screen = new Screen((f) => this.ctx.net.sendMedia(3, f), () => this.stopScreen(), (pkt) => this.ctx.net.sendMedia(4, pkt));
       await this.screen.start();
       this.ctx.try(this.ctx.api('call_state', { screen: true }));
     } catch (e) {

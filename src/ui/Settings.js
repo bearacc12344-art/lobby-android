@@ -1,3 +1,5 @@
+import { AppLogo } from '../util/logo.js';
+import { ThemesPage } from './Themes.js';
 import { html, useBus, useEffect, useState } from './h.js';
 import { I } from '../util/icons.js';
 import { ctx } from '../ctx.js';
@@ -12,7 +14,7 @@ import { prepareAvatar } from '../util/image.js';
 import { isNative, LobbyNative } from '../native.js';
 
 const PAGES = [
-  ['account', '👤', 'My Account'], ['privacy', '🛡️', 'Privacy & Trust'], ['notifications', '🔔', 'Notifications'], ['appearance', '🎨', 'Appearance'],
+  ['account', '👤', 'My Account'], ['privacy', '🛡️', 'Privacy & Trust'], ['themes', '🖼', 'Themes'], ['appearance', '🎨', 'Appearance'], ['notifications', '🔔', 'Notifications'],
   ['voice', '🎙️', 'Voice & Video'], ['soundboard', '🔊', 'Soundboard'], ['chat', '💬', 'Chat'], ['brain', '🧠', 'The Smult Brain'],
   ['advanced', '⚙️', 'Advanced'], ['admin', '🏅', 'Admin & badges'], ['about', 'ℹ️', 'About'],
 ];
@@ -143,9 +145,7 @@ function Appearance() {
     ${want !== langNow ? html`<button class="btn primary block" onClick=${() => location.reload()}>${tr('🔄 Restart now')}</button>` : null}
     <${Note} t="Chat messages from your friends are never translated, only Smult's own buttons and text." />
     <${Sec} t="Theme" />
-    <div style=${{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>${Object.entries(THEMES).map(([name, p]) => html`<button class="btn"
-      style=${{ background: p.panel2, color: p.text, borderColor: S.get('theme') === name ? p.accent : p.border, borderWidth: '2px', borderLeft: '6px solid ' + p.accent }}
-      onClick=${() => { S.set('theme', name); S.set('accent', ''); set((x) => x + 1); }}>${name}</button>`)}</div>
+    <button class="btn primary block" onClick=${() => ctx.push({ kind: 'settings', page: 'themes' })}>${tr('🎨 Themes, theme editor & backgrounds')}</button>
     <div class="row" style=${{ marginTop: '10px' }}><span class="grow">${tr('🎨 Custom accent color')}</span>
       <input type="color" value=${palette().accent} onInput=${(e) => S.set('accent', e.target.value)} />
       <button class="btn small" onClick=${() => { S.set('accent', ''); set((x) => x + 1); }}>${tr('Reset accent')}</button></div>
@@ -175,6 +175,7 @@ function Voice() {
     <${Select} k="screen_fps" label="Frame rate" options=${[[5, '5 fps'], [8, '8 fps'], [12, '12 fps'], [15, '15 fps']]} />
     <${Select} k="screen_codec" label="Codec" options=${[['jpg', 'JPEG (fast)'], ['webp', 'WebP (sharper text, more CPU)']]} />
     <${Slider} k="screen_quality" label="Quality" min=${40} max=${95} suffix="%" />
+    <${Check} k="screen_audio" label="Share my phone's sound too" sub="Games, videos, music (Android 10+). Friends' voices are never included." />
   </${Page}>`;
 }
 
@@ -260,7 +261,7 @@ function Advanced() {
 
 function About() {
   return html`<${Page} title="About">
-    <div class="center" style=${{ margin: '20px 0' }}><div class="emoji" style=${{ fontSize: '56px' }}>${I('🚪')}</div><b style=${{ fontSize: '1.8em', color: 'var(--accent)' }}>LOBBY</b>
+    <div class="center" style=${{ margin: '20px 0' }}><${AppLogo} size=${84} /><br /><b style=${{ fontSize: '1.8em', color: 'var(--accent)' }}>SMULT</b>
       <div class="muted">for Android · v1.0</div></div>
     <p>${tr('Smult — made for you and your friends.')}</p>
     <p class="small muted">${tr('Same accounts, chats, groups, calls and community brains as Smult on PC. Peer-to-peer over Nostr relays, end-to-end encrypted, calls go directly between devices (WebRTC).')}</p>
@@ -273,6 +274,7 @@ export function SettingsPage({ page }) {
   if (page === 'privacy') return html`<${Privacy} />`;
   if (page === 'notifications') return html`<${Notifications} />`;
   if (page === 'appearance') return html`<${Appearance} />`;
+  if (page === 'themes') return html`<${ThemesPage} />`;
   if (page === 'voice') return html`<${Voice} />`;
   if (page === 'soundboard') return html`<${Soundboard} />`;
   if (page === 'chat') return html`<${Chat} />`;

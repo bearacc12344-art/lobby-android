@@ -308,3 +308,41 @@ html:not(.noanim) .applogo { animation: logoFloat 3.2s ease-in-out infinite; }
 .st-swatch { width: 30px; height: 30px; border-radius: 50%; border: 2px solid rgba(255,255,255,.25); cursor: pointer; transition: transform .15s; }
 .st-swatch.on { transform: scale(1.18); border-color: #fff; box-shadow: 0 0 12px rgba(41,224,255,.6); }
 .noanim .st-ring, .noanim .st-view, .noanim .st-card, .noanim .st-av.new { animation: none; }
+.ico.col .f { fill: var(--icf) !important; }
+/* music folders */
+.folders { display: flex; gap: 8px; overflow-x: auto; padding: 2px 0 6px; scrollbar-width: none; }
+.folders::-webkit-scrollbar { display: none; }
+.folder { flex: none; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-width: 112px; padding: 10px 12px; border-radius: 16px;
+  background: var(--panel2); border: 1px solid var(--border); color: var(--text); font: inherit; text-align: left; animation: popIn .3s ease both;
+  border-top: 3px solid var(--fc, var(--border)); }
+.folder small { color: var(--muted); font-size: .78em; }
+.folder.on { background: linear-gradient(135deg, color-mix(in srgb, var(--fc, var(--accent)) 30%, var(--panel2)), var(--panel2)); border-color: var(--fc, var(--accent)); }
+.folder.add { border-style: dashed; justify-content: center; color: var(--muted); }
+.noanim .folder { animation: none; }
+/* ---------- picture / GIF background (Settings → Themes) ---------- */
+#bgLayer { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
+#bgLayer .pic { position: absolute; inset: -20px; background-size: cover; background-position: center; }
+#bgLayer .tint { position: absolute; inset: 0; background: var(--bg); }
+.has-bg body, .has-bg .screen, .has-bg .content { background: transparent !important; }
+.has-bg #app { position: relative; z-index: 1; }
+.has-bg .topbar, .has-bg .composer, .has-bg .bottomnav { background: color-mix(in srgb, var(--panel) calc(var(--glass-a) * 100%), transparent) !important;
+  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
+.has-bg .list .item, .has-bg .card, .has-bg .msg .bub { background: color-mix(in srgb, var(--panel2) calc(var(--glass-a) * 100%), transparent); }
+.has-bg .sheet { background: color-mix(in srgb, var(--panel) 94%, transparent); }
+/* ---------- theme editor ---------- */
+.ttiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.ttile { border: 2px solid transparent; border-radius: 14px; padding: 4px; background: none; color: var(--text); font: inherit; animation: popIn .3s ease both; }
+.ttile.on { border-color: var(--accent); }
+.ttile .pv { height: 64px; border-radius: 10px; position: relative; overflow: hidden; }
+.ttile .pv i { position: absolute; border-radius: 5px; }
+.ttile small { display: block; margin-top: 4px; font-size: .78em; color: var(--muted); }
+.doors { margin-top: 14px; border: 2px solid #8a6a3a; border-radius: 10px; padding: 14px; background: linear-gradient(180deg, #2a1d12, #140d08); color: #f2e4cc; }
+.doors h3 { margin: 0 0 4px; font-family: 'Doors', var(--font); color: #f0c674; letter-spacing: 2px; font-size: 1.4em; }
+.doors .sub { color: #c9a978; font-size: .85em; margin-bottom: 10px; }
+.doors input.field, .doors select.field { background: #1b120b; border: 1px solid #8a6a3a; color: #f2e4cc; }
+.plaques { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin: 10px 0; }
+.plaque { position: relative; display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 2px solid #8a6a3a; border-radius: 6px; font-weight: 700; font-size: .85em; overflow: hidden; }
+.plaque input { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; }
+.doors .btn { background: #3a2814; border: 1px solid #c49a4a; color: #f0c674; font-weight: 700; }
+.bigprev { height: 150px; border-radius: 12px; position: relative; overflow: hidden; border: 1px solid #8a6a3a; }
+.bigprev i { position: absolute; border-radius: 7px; }

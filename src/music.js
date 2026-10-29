@@ -53,7 +53,43 @@ export class Music {
     if (!S.get('music_builtin_hidden')) lib = [{ title: 'No More Remastered', file: BUILTIN, url: '', dur: 0, builtin: true }, ...lib];
     return lib.map((s) => ({ ...s, disabled: off.has(s.file) }));
   }
-  enabled() { return this.songs().filter((s) => !s.disabled); }
+  enabled() { return this.songsIn(S.get('music_playlist') || '').filter((s) => !s.disabled); }
+
+  // ---- folders / playlists (same shape as PC Smult)
+  playlists() { return [...(S.get('playlists') || [])]; }
+  playlist(id) { return this.playlists().find((p) => p.id === id) || null; }
+  songsIn(id) {
+    const all = this.songs();
+    const pl = id && this.playlist(id);
+    if (!pl) return all;
+    const by = new Map(all.map((s) => [s.file, s]));
+    return (pl.songs || []).map((f) => by.get(f)).filter(Boolean);
+  }
+  savePl(pls) { S.set('playlists', pls); this.emit(); }
+  newPlaylist(name, songs = [], color = '') {
+    const id = Math.random().toString(16).slice(2, 10);
+    this.savePl([...this.playlists(), { id, name: (name || 'New playlist').slice(0, 40), songs: [...songs], color }]);
+    return id;
+  }
+  renamePlaylist(id, name) { this.savePl(this.playlists().map((p) => (p.id === id ? { ...p, name: name.slice(0, 40) } : p))); }
+  deletePlaylist(id) { if (S.get('music_playlist') === id) S.set('music_playlist', ''); this.savePl(this.playlists().filter((p) => p.id !== id)); }
+  addToPlaylist(id, files) { this.savePl(this.playlists().map((p) => (p.id === id ? { ...p, songs: [...(p.songs || []), ...files.filter((f) => !(p.songs || []).includes(f))] } : p))); }
+  removeFromPlaylist(id, files) { this.savePl(this.playlists().map((p) => (p.id === id ? { ...p, songs: (p.songs || []).filter((f) => !files.includes(f)) } : p))); }
+  moveInPlaylist(id, f, step) {
+    this.savePl(this.playlists().map((p) => {
+      if (p.id !== id) return p;
+      const a = [...(p.songs || [])], i = a.indexOf(f), j = i + step;
+      if (i < 0 || j < 0 || j >= a.length) return p;
+      [a[i], a[j]] = [a[j], a[i]];
+      return { ...p, songs: a };
+    }));
+  }
+  playPlaylist(id, f) {
+    S.set('music_playlist', id || '');
+    const files = this.enabled().map((s) => s.file);
+    if (!files.length) { this.emit(); return false; }
+    return this.play(files.includes(f) ? f : files[0]);
+  }
   track() {
     const f = S.get('music_file') || '';
     const ok = this.enabled().map((s) => s.file);
@@ -77,6 +113,7 @@ export class Music {
     const lib = (S.get('music_library') || []).filter((s) => s.file !== song.file);
     lib.push(song);
     S.set('music_library', lib);
+    if (this.addTarget && this.playlist(this.addTarget)) this.addToPlaylist(this.addTarget, [song.file]);   // added while a folder is open
     if (play) this.play(song.file);
     this.emit();
   }
@@ -85,6 +122,7 @@ export class Music {
       S.set('music_builtin_hidden', true);
     } else {
       S.set('music_library', (S.get('music_library') || []).filter((s) => s.file !== f));
+      S.set('playlists', this.playlists().map((p) => ({ ...p, songs: (p.songs || []).filter((x) => x !== f) })));
       if (f.startsWith('idb:')) await idb.del('kv', f.slice(4)).catch(() => {});
       if (f.startsWith('path:') && isNative) LobbyNative.deleteFile({ path: f.slice(5) }).catch(() => {});
     }

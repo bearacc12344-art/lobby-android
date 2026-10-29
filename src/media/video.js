@@ -52,13 +52,15 @@ export class Camera {
 
 // Screen share: Android -> native MediaProjection (LobbyNativePlugin); browsers -> getDisplayMedia
 export class Screen {
-  constructor(onFrame, onEnd) { this.onFrame = onFrame; this.onEnd = onEnd; }
+  constructor(onFrame, onEnd, onAudio) { this.onFrame = onFrame; this.onEnd = onEnd; this.onAudio = onAudio; }
   async start() {
     if (isNative) {
       this.sub = await LobbyNative.addListener('screenFrame', (e) => { if (e.data) this.onFrame(unb64(e.data)); });
       this.endSub = await LobbyNative.addListener('screenStopped', () => this.onEnd && this.onEnd());
+      // the phone's own sound (games, videos) goes along too (Android 10+); friends' voices are never captured
+      this.audioSub = await LobbyNative.addListener('screenAudio', (e) => { if (e.data && this.onAudio) this.onAudio(unb64(e.data)); });
       await LobbyNative.startScreen({ fps: S.get('screen_fps'), maxHeight: S.get('screen_res'), quality: S.get('screen_quality'),
-        codec: S.get('screen_codec'), title: 'Smult', text: 'Sharing your screen in a call' });
+        codec: S.get('screen_codec'), audio: S.get('screen_audio') !== false, title: 'Smult', text: 'Sharing your screen in a call' });
       return null;
     }
     this.stream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: S.get('screen_fps') }, audio: false });
@@ -102,6 +104,7 @@ export class Screen {
       await LobbyNative.stopScreen().catch(() => {});
       this.sub && this.sub.remove();
       this.endSub && this.endSub.remove();
+      this.audioSub && this.audioSub.remove();
     }
     if (this.stream) this.stream.getTracks().forEach((t) => t.stop());
   }

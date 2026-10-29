@@ -14,14 +14,15 @@ export function preview(c) {
   if (S.get('streamer_mode')) return tr('hidden (streamer mode)');
   if (!m) return tr('no messages yet');
   if (m.deleted) return tr('message deleted');
-  let body = m.body;
-  if (m.kind === 'image') body = '🖼️ ' + (m.body || tr('🖼️ Photo').replace('🖼️ ', ''));
-  else if (m.kind === 'voice') body = tr('🎤 Voice message');
-  else if (m.kind === 'file') body = '📎 ' + ((m.file || {}).name || 'file');
-  else if (m.kind === 'poll') body = '📊 ' + (m.body || tr('Poll'));
-  else if (m.kind === 'call') body = tr('📞 Call');
+  let body = m.body, ic = null;
+  if (m.kind === 'image') { ic = '🖼️'; body = m.body || tr('🖼️ Photo').replace('🖼️ ', ''); }
+  else if (m.kind === 'voice') { ic = '🎤'; body = tr('🎤 Voice message').replace('🎤 ', ''); }
+  else if (m.kind === 'file') { ic = '📎'; body = (m.file || {}).name || 'file'; }
+  else if (m.kind === 'poll') { ic = '📊'; body = m.body || tr('Poll'); }
+  else if (m.kind === 'call') { ic = '📞'; body = tr('📞 Call').replace('📞 ', ''); }
   const who = m.sender === st.myId ? tr('You:') + ' ' : c.kind === 'group' && m.kind !== 'system' ? st.name(m.sender) + ': ' : '';
-  return who + (body || '').replace(/\n/g, ' ');
+  const txt = who + (body || '').replace(/\n/g, ' ');
+  return ic ? [I(ic), ' ', txt] : txt;
 }
 
 function chatMenu(c) {
@@ -74,8 +75,8 @@ export function ChatList() {
           return html`<div class="item chatrow" key=${c.id} ...${longPress(() => chatMenu(c), () => ctx.openChat(c.id))}>
             <${ChatAvatar} chat=${c} size=${50} />
             <div class="grow"><div class="row"><b class="grow ellipsis">${c.kind === 'group' ? '' : ''}${st.chatTitle(c)}</b></div>
-              <div class="prev ellipsis" style=${typing.length ? { color: 'var(--accent)' } : null}>
-                ${c.call ? '🔊 ' + tr('Call in progress') : typing.length ? tr(`${typing.join(', ')} typing...`) : preview(c)}</div></div>
+              <div class="prev ellipsis" data-raw=${1} style=${typing.length ? { color: 'var(--accent)' } : null}>
+                ${c.call ? [I('🔊'), ' ', tr('Call in progress')] : typing.length ? tr(`${typing.join(', ')} typing...`) : preview(c)}</div></div>
             <div class="meta"><span class="tiny muted">${c.last ? fmtShort(c.last.created) : ''}</span>
               <span class="row" style=${{ gap: '4px' }}>${c.my.pinned ? html`<span class="emoji tiny">${I('📌')}</span>` : null}${c.my.muted ? html`<span class="emoji tiny">${I('🔕')}</span>` : null}
               ${c.unread ? html`<span class=${'badge' + (c.mentions ? ' red' : c.my.muted ? ' grey' : '')}>${c.mentions ? '@' : c.unread}</span>` : null}</span></div>

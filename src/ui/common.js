@@ -11,7 +11,7 @@ export function Avatar({ user, size = 44, presence = true, ring = false, onClick
   let inner;
   if (u.pic_url && u.pic_url.startsWith('https://')) inner = html`<img src=${u.pic_url} onError=${(e) => { e.target.src = u.pic ? 'data:image/jpeg;base64,' + u.pic : ''; }} />`;
   else if (u.pic) inner = html`<img src=${'data:image/jpeg;base64,' + u.pic} />`;
-  else if (u.avatar) inner = html`<span class="emoji" style=${{ fontSize: size * 0.55 + 'px' }}>${u.avatar}</span>`;
+  else if (u.avatar) inner = html`<span class="emoji" data-raw=${1} style=${{ fontSize: size * 0.55 + 'px' }}>${u.avatar}</span>`;
   else inner = html`<span style=${{ fontSize: size * 0.38 + 'px' }}>${initials(u.display || u.username)}</span>`;
   return html`<div class=${'avatar' + (ring ? ' ring' : '')} style=${{ width: size + 'px', height: size + 'px' }} onClick=${onClick}>
     <div class="inner" style=${{ background: u.pic || u.pic_url ? 'var(--panel3)' : u.color || '#d9a441' }}>${inner}</div>
@@ -24,7 +24,7 @@ export function GroupAvatar({ chat, size = 44 }) {
     return html`<${Avatar} user=${{ pic: chat.pic, pic_url: chat.pic_url, display: chat.name }} size=${size} presence=${false} />`;
   }
   return html`<div class="avatar" style=${{ width: size + 'px', height: size + 'px' }}>
-    <div class="inner" style=${{ background: 'var(--panel3)' }}><span class="emoji" style=${{ fontSize: size * 0.5 + 'px' }}>${chat.icon || '👥'}</span></div></div>`;
+    <div class="inner" style=${{ background: 'var(--panel3)' }}>${chat.icon ? html`<span class="emoji" data-raw=${1} style=${{ fontSize: size * 0.5 + 'px' }}>${chat.icon}</span>` : html`<span class="emoji" style=${{ fontSize: size * 0.5 + 'px' }}>${I('👥')}</span>`}</div></div>`;
 }
 
 export function ChatAvatar({ chat, size = 44 }) {

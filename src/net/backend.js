@@ -1706,7 +1706,11 @@ export class Backend {
         this.callChanged(c);
         if (fresh) this.pushUser(author);
       }
-      if (this.myCall === gcid && !this.peers.has(author) && this.k.pub < this.pub(author)) await this.connectPeer(author, c);
+      const joining = !!(pl.st || {}).joining, dialing = (pl.st || {}).dialing || [];
+      if (this.myCall === gcid && !this.peers.has(author)) {
+        if (joining) { if (!dialing.includes(this.k.pub.slice(0, 16))) await this.connectPeer(author, c); }   // joined right when I did
+        else if (this.k.pub < this.pub(author)) await this.connectPeer(author, c);
+      }
     } else if (t === 'call_leave') {
       if (c.parts.has(author)) {
         c.parts.delete(author);
@@ -1790,8 +1794,10 @@ export class Backend {
     this.myCall = c.gcid;
     this.myState = { muted: !!d.muted, deaf: false, cam: false, screen: false };
     if (this.rings.has(c.gcid)) { this.rings.delete(c.gcid); this.emit({ t: 'call_ring_stop', call_id: c.id }); }
-    await this.callSignal(c, { type: 'call_presence', st: this.presenceSt() });
-    for (const u of [...c.parts.keys()]) if (!this.peers.has(u) && this.k.pub < this.pub(u)) await this.connectPeer(u, c);
+    // the one joining dials everyone at once (and says so, so nobody dials back = no glare)
+    const targets = [...c.parts.keys()].filter((u) => !this.peers.has(u) && u !== this.me);
+    await this.callSignal(c, { type: 'call_presence', st: { ...this.presenceSt(), joining: true, dialing: targets.map((u) => this.pub(u).slice(0, 16)) } });
+    await Promise.all(targets.map((u) => this.connectPeer(u, c).catch(() => null)));
     this.callChanged(c);
     this.pushUser(this.me);
     return this.callView(c);
@@ -1884,11 +1890,11 @@ export class Backend {
       const [first, last, n] = this.dial.get(u) || [t, 0, 0];
       this.dial.set(u, [first, last, n]);
       const lower = this.k.pub < this.pub(u);
-      const stuck = !p || t - p.born > 12 || ['failed', 'closed'].includes(p.pc.connectionState);
-      if (stuck && t - last > (lower ? 12 : 25) && (lower || t - first > 20)) {
+      const stuck = !p || (t - p.born > 7 && !this.linkOk(u)) || ['failed', 'closed'].includes(p.pc.connectionState);
+      if (stuck && t - last > (lower ? 6 : 14) && (lower || t - first > 12)) {
         this.dial.set(u, [first, t, n + 1]);
         this.closePeer(u);
-        await this.connectPeer(u, c);
+        await this.connectPeer(u, c, true);
       }
       if (t - first > 30 && !this.warned.has(u) && !this.relayFor(c, u)) {
         this.warned.add(u);
@@ -1903,11 +1909,11 @@ export class Backend {
     if (!p) return;
     const pre = new Uint8Array(9);
     pre[0] = 0xf0; pre.set(unhex(this.pub(dest).slice(0, 16)), 1);
-    if (kind === 1) {
+    if (kind === 1 || kind === 4) {
       const ch = p.ch.a;
       if (!ch || ch.readyState !== 'open') return;
       const pkt = new Uint8Array(10 + payload.length);
-      pkt.set(pre); pkt[9] = 1; pkt.set(payload, 10);
+      pkt.set(pre); pkt[9] = kind; pkt.set(payload, 10);
       try { ch.send(pkt); this.net.bytes.up += pkt.length; } catch (e) {}
       return;
     }
@@ -1948,16 +1954,25 @@ export class Backend {
     };
   }
   async gathered(pc) {
-    // aiortc (PC Smult) doesn't do trickle ICE: wait until every candidate is in the SDP
+    // aiortc (PC Smult) doesn't do trickle ICE: candidates must be in the SDP. Don't wait for every last one though:
+    // once a public (srflx/relay) address is in, give it 300 ms more; never more than 1.5 s (was up to 3.5 s)
     if (pc.iceGatheringState === 'complete') return;
     await new Promise((res) => {
-      const t = setTimeout(res, 3500);
-      pc.addEventListener('icegatheringstatechange', () => { if (pc.iceGatheringState === 'complete') { clearTimeout(t); res(); } });
+      let done = false, soon = null;
+      const fin = () => { if (!done) { done = true; clearTimeout(cap); clearTimeout(soon); res(); } };
+      const cap = setTimeout(fin, this.turn && this.turn.url ? 3000 : 1500);
+      pc.addEventListener('icegatheringstatechange', () => { if (pc.iceGatheringState === 'complete') fin(); });
+      pc.addEventListener('icecandidate', (e) => {
+        if (!e.candidate) return fin();
+        if (/ typ (srflx|relay)/.test(e.candidate.candidate) && !soon && !(this.turn && this.turn.url && !/ typ relay/.test(e.candidate.candidate))) soon = setTimeout(fin, 300);
+      });
     });
   }
-  async connectPeer(uid, c) {
+  async connectPeer(uid, c, force = false) {
+    const cur = this.peers.get(uid);
+    if (cur && !force && !['failed', 'closed'].includes(cur.pc.connectionState) && Date.now() / 1000 - cur.born < 8) return cur;
     const pc = new RTCPeerConnection(this.rtcConfig());
-    const peer = { uid, pc, ch: {}, frames: new Map(), fid: { 2: 0, 3: 0 }, retried: false, born: Date.now() / 1000 };
+    const peer = { uid, pc, ch: {}, frames: new Map(), fid: { 2: 0, 3: 0 }, retried: false, born: Date.now() / 1000, offering: true };
     this.peers.set(uid, peer);
     this.watchPc(peer, c);
     this.setupChannel(peer, pc.createDataChannel('a', { ordered: false, maxRetransmits: 0 }));
@@ -1972,7 +1987,7 @@ export class Backend {
   }
   async acceptOffer(uid, c, sdp) {
     const cur = this.peers.get(uid);
-    if (cur && cur.pc.signalingState === 'have-local-offer' && this.k.pub < this.pub(uid) && Date.now() / 1000 - cur.born < 10) return;   // glare: lower key's offer wins
+    if (cur && cur.offering && !['failed', 'closed'].includes(cur.pc.connectionState) && this.k.pub < this.pub(uid) && Date.now() / 1000 - cur.born < 10) return;   // glare (even mid-gathering): lower key's offer wins
     this.closePeer(uid);
     const pc = new RTCPeerConnection(this.rtcConfig());
     const peer = { uid, pc, ch: {}, frames: new Map(), fid: { 2: 0, 3: 0 }, retried: false, born: Date.now() / 1000 };
@@ -2029,7 +2044,7 @@ export class Backend {
       if (!b.length) return;
       kind = b[0];
     }
-    if (label === 'a' && kind === 1) this.net.media(peer.uid, 1, b.subarray(1));
+    if (label === 'a' && (kind === 1 || kind === 4)) this.net.media(peer.uid, kind, b.subarray(1));
     else if (label === 'v' && (kind === 2 || kind === 3) && b.length > 5) {
       const fid = (b[1] << 8) | b[2], idx = b[3], n = b[4];
       const key = kind * 65536 + fid;
@@ -2057,18 +2072,18 @@ export class Backend {
     const c = this.calls.get(this.myCall);
     if (c) {                                        // members we can't reach directly: through a shared friend
       for (const uid of c.parts.keys()) {
-        if (uid === this.me || this.linkOk(uid) || (kind === 1 && c.parts.get(uid)?.deaf)) continue;
+        if (uid === this.me || this.linkOk(uid) || ((kind === 1 || kind === 4) && c.parts.get(uid)?.deaf)) continue;
         const r = this.relayFor(c, uid);
         if (r) this.sendVia(r, uid, kind, payload);
       }
     }
     for (const [uid, p] of this.peers) {
-      if (kind === 1) {
+      if (kind === 1 || kind === 4) {
         if (c && c.parts.get(uid)?.deaf) continue;
         const ch = p.ch.a;
-        if (ch && ch.readyState === 'open') {
+        if (ch && ch.readyState === 'open' && (kind === 1 || ch.bufferedAmount < 200000)) {
           const pkt = new Uint8Array(payload.length + 1);
-          pkt[0] = 1; pkt.set(payload, 1);
+          pkt[0] = kind; pkt.set(payload, 1);
           try { ch.send(pkt); this.net.bytes.up += pkt.length; } catch (e) {}
         }
       } else {
