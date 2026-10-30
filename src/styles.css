@@ -396,4 +396,4 @@ html:not(.noanim) .applogo { animation: logoFloat 3.2s ease-in-out infinite; }
 .bpal { display: flex; gap: 10px; overflow-x: auto; align-items: flex-start; padding: 8px 10px calc(8px + env(safe-area-inset-bottom)); background: #1a120b; min-height: 96px; }
 .bpal .dblock { flex: none; transform: scale(.9); transform-origin: top left; }
 .bdrag { position: fixed; z-index: 1000; pointer-events: none; opacity: .92; filter: drop-shadow(0 8px 14px rgba(0,0,0,.6)); }
-.bar { height: 8px; border-radius: 4px; background: var(--panel3); overflow: hidden; } .bar i { display: block; height: 100%; background: var(--accent); }
+.abar { height: 8px; border-radius: 4px; background: var(--panel3); overflow: hidden; } .abar i { display: block; height: 100%; background: var(--accent); }

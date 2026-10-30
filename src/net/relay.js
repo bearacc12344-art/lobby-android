@@ -95,6 +95,19 @@ export class RelayPool {
       this.seen.set(ev.id, 0);       // 0 = being checked
       this.queue.push([sid, ev]);
       this._flush();
+    } else if (typ === 'CLOSED' && msg.length >= 2) {
+      // a relay ended one of our subscriptions: send it again (smaller if it complained about filters)
+      const sid = String(msg[1]), why = String(msg[2] || '').toLowerCase(), base = sid.split('.')[0];
+      if (!this.subs.has(sid) || sid.startsWith('q')) return;
+      if (/filter|too many|limit/.test(why) && (this.chunk?.[base] || 5) > 1) {
+        this.chunk = this.chunk || {};
+        this.chunk[base] = Math.max(1, Math.floor((this.chunk[base] || 5) / 2));
+        const all = [...this.subs.entries()].filter(([k]) => k === base || k.startsWith(base + '.')).sort().flatMap(([, v]) => v);
+        this.subscribe(base, all);
+        return;
+      }
+      const ws = this.ws.get(url);
+      setTimeout(() => { if (ws && this.subs.has(sid)) { try { ws.send(JSON.stringify(['REQ', sid, ...this.subs.get(sid)])); } catch (e) {} } }, 4000 + Math.random() * 4000);
     } else if (typ === 'EOSE') {
       const sid = msg[1];
       const w = this.waiters.get(sid);
@@ -146,9 +159,21 @@ export class RelayPool {
     }
     this._sendAll(JSON.stringify(['EVENT', ev]));
   }
+  // one logical subscription sent as several small REQs (sid, sid.1, ...): many relays refuse more than ~10 filters
   subscribe(sid, filters) {
-    this.subs.set(sid, filters);
-    this._sendAll(JSON.stringify(['REQ', sid, ...filters]));
+    // a REQ with the same id replaces the old one on the relay (no gap where live presence gets lost);
+    // only chunks that aren't used any more get closed
+    const old = [...this.subs.keys()].filter((k) => k === sid || k.startsWith(sid + '.'));
+    this.chunk = this.chunk || {};
+    const n = Math.max(1, this.chunk[sid] || 5);
+    const used = new Set();
+    for (let i = 0; i < filters.length; i += n) {
+      const k = i === 0 ? sid : `${sid}.${i / n}`;
+      used.add(k);
+      this.subs.set(k, filters.slice(i, i + n));
+      this._sendAll(JSON.stringify(['REQ', k, ...this.subs.get(k)]));
+    }
+    for (const k of old) if (!used.has(k)) { this.subs.delete(k); this._sendAll(JSON.stringify(['CLOSE', k])); }
   }
   query(filters, timeout = 5000) {
     const sid = 'q' + Math.random().toString(16).slice(2, 10);

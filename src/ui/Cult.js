@@ -68,7 +68,7 @@ function Widget({ h, w }) {
     <input type="checkbox" checked=${!!w.value} onChange=${(e) => { w.value = e.target.checked; if (w.fn) h.call(w.fn, w.value); }} /></label>`;
   if (w.kind === 'input') return html`<input class="field" style=${{ margin: '4px 0' }} placeholder=${String(w.a || '')}
     onKeyDown=${(e) => { if (e.key === 'Enter' && w.fn) { h.call(w.fn, e.target.value); e.target.value = ''; } }} />`;
-  if (w.kind === 'progress') return html`<div class="bar" style=${{ margin: '6px 0' }}><i style=${{ width: Math.max(0, Math.min(100, Number(w.value ?? w.a ?? 0))) + '%' }}></i></div>`;
+  if (w.kind === 'progress') return html`<div class="abar" style=${{ margin: '6px 0' }}><i style=${{ width: Math.max(0, Math.min(100, Number(w.value ?? w.a ?? 0))) + '%' }}></i></div>`;
   if (w.kind === 'canvas') return html`<${AddonCanvas} h=${h} w=${w} />`;
   return null;
 }

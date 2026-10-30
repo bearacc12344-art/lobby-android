@@ -181,6 +181,7 @@ export class Backend {
     const u = this.q1('SELECT * FROM users WHERE id=?', this.me);
     const body = { username: u.username, display: u.display, avatar: u.avatar, color: u.color, bio: u.bio,
       status_msg: u.status_msg, reg: u.reg, pic: u.pic || '', pic_url: u.pic_url || '' };
+    if (!body.pic && !body.pic_url && this.kv('pic_removed', false)) body.pic_removed = true;   // empty only wipes when really removed
     const ev = this.k.sign(K_REPL, [['d', D_PROFILE], ['u', u.username.toLowerCase()], ['t', 'lobby']], JSON.stringify(body));
     this.x('UPDATE users SET profile_ts=? WHERE id=?', ev.created_at, this.me);
     this.pool.publish(ev);
@@ -406,6 +407,8 @@ export class Backend {
       f.push({ kinds: [K_GROUP], '#g': g, since, limit: 5000 });
       f.push({ kinds: [K_GEPH], '#g': g, since: Math.floor(now()) - 20 });
     }
+    const prio = { [K_DIRECT]: 0, [K_GROUP]: 1, [K_GEPH]: 2, [K_EPH]: 3, [K_REPL]: 4 };   // most important in the first REQ
+    f.sort((a, b) => (prio[a.kinds[0]] ?? 9) - (prio[b.kinds[0]] ?? 9));
     if (initial) this.eose.clear();
     this.pool.subscribe('main', f);
   }
@@ -608,6 +611,10 @@ export class Backend {
     pic = pic.length <= 48000 && /^[A-Za-z0-9+/=]*$/.test(pic) ? pic : '';
     let picUrl = String(p.pic_url || '');
     picUrl = picUrl.startsWith('https://') && picUrl.length < 400 ? picUrl : '';
+    if (!pic && !picUrl && !p.pic_removed) {          // a device without the photo re-published: keep the one we have
+      const had = this.q1('SELECT pic, pic_url FROM users WHERE pubkey=?', ev.pubkey);
+      if (had) { pic = had.pic || ''; picUrl = had.pic_url || ''; }
+    }
     this.x('UPDATE users SET username=?, display=?, avatar=?, color=?, bio=?, status_msg=?, reg=?, profile_ts=?, pic=?, pic_url=? WHERE id=?',
       cleanStr(p.username, 20), cleanStr(p.display, 32) || cleanStr(p.username, 20), cleanStr(p.avatar, 16), col, cleanStr(p.bio, 500),
       cleanStr(p.status_msg, 120), parseFloat(p.reg || 0) || 0, ev.created_at, pic, picUrl, uid);
@@ -778,11 +785,12 @@ export class Backend {
         if (mine) this.x('UPDATE relations SET trusted=? WHERE user_id=?', pl.on ? 1 : 0, other);
         else this.x('UPDATE relations SET trusts_me=? WHERE user_id=?', pl.on ? 1 : 0, other);
       }
+      const nowFriend = (this.rel(other) || {}).state === 'friend';
+      if (nowFriend && st !== 'friend') this.replayDmStash(other);     // messages that came before the "accepted"
       if (live) {
         this.pushRel(other);
         if (t === 'friend_request' || t === 'friend_accept') {
-          this.resubscribe();
-          fire(this.sendPresence([other]));
+          fire((async () => { await this.resubscribe(); await this.sendPresence([other], false, true); })());   // "hi" after the new subscription is in
         }
       }
       return;
@@ -794,9 +802,25 @@ export class Backend {
       if (live) fire(this.processStash(pl.gid));
       return;
     }
-    if (!mine && !(r && r.state === 'friend') && !this.q1('SELECT 1 FROM chats WHERE ckey=?', 'dm:' + this.pub(other))) return;
+    if (!mine && !(r && ['friend', 'out'].includes(r.state)) && !this.q1('SELECT 1 FROM chats WHERE ckey=?', 'dm:' + this.pub(other))) {
+      // strangers can't open DMs - but keep it a while: if they become a friend it shows up then
+      if (pl.type === 'msg' && r && r.state === 'in') {
+        const stash = this.kv('dm_stash', {}) || {};
+        const lst = (stash[other] = stash[other] || []);
+        if (lst.length < 50) { lst.push([author, pl]); this.setKv('dm_stash', Object.fromEntries(Object.entries(stash).slice(-40))); }
+      }
+      return;
+    }
     const cid = this.dmChat(other, true);
     this.applyChatOp(cid, author, pl, live);
+  }
+  replayDmStash(other) {
+    const stash = this.kv('dm_stash', {}) || {};
+    const items = stash[other];
+    if (!items) return;
+    delete stash[other];
+    this.setKv('dm_stash', stash);
+    for (const [author, pl] of items) { try { this.applyDirect(author, other, pl, true); } catch (e) {} }
   }
   setRel(uid, state, ts) {
     const r = this.rel(uid);
@@ -845,7 +869,7 @@ export class Backend {
     for (const [pub, role] of Object.entries(members)) {
       if (isHex64(pub)) this.x('INSERT OR REPLACE INTO members VALUES(?,?,?,?)', cid, this.uid(pub), role, ts);
     }
-    if (pl.pic !== undefined) {
+    if (pl.pic || pl.pic_url) {                        // (an empty photo in an invite never wipes the real one)
       const pic = String(pl.pic || ''), url = String(pl.pic_url || '');
       this.x('UPDATE chats SET pic=?, pic_url=? WHERE id=?', pic.length <= 48000 ? pic : '', url.startsWith('https://') ? url : '', cid);
     }
@@ -980,7 +1004,8 @@ export class Backend {
   async applyEph(author, pl, cid) {
     const t = pl.type;
     if (t === 'presence') {
-      if (!this.isFriend(author) && !this.q1('SELECT 1 FROM members WHERE user_id=?', author)) return;
+      const rr = this.rel(author);
+      if (!this.isFriend(author) && !(rr && rr.state === 'out') && !this.q1('SELECT 1 FROM members WHERE user_id=?', author)) return;
       const was = this.presenceOf(author);
       const p = pl.p || 'online';
       if (p === 'offline') {
@@ -1081,7 +1106,7 @@ export class Backend {
     return this.userPub(this.me);
   }
   async on_set_avatar(d) {
-    if (d.kind === 'none') this.x("UPDATE users SET pic='', pic_url='' WHERE id=?", this.me);
+    if (d.kind === 'none') { this.x("UPDATE users SET pic='', pic_url='' WHERE id=?", this.me); this.setKv('pic_removed', true); }
     else {
       const still = String(d.still || '');
       if (!still || still.length > 48000) throw new Err('Picture is too big');
@@ -1092,6 +1117,7 @@ export class Backend {
         url = await this.upload(raw);
       }
       this.x('UPDATE users SET pic=?, pic_url=? WHERE id=?', still, url, this.me);
+      this.setKv('pic_removed', false);
     }
     await this.publishProfile();
     this.pushUser(this.me);

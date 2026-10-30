@@ -126,6 +126,15 @@ export async function zipAddon(files) {
 }
 
 // ---------------------------------------------------------------- one running add-on
+// Lua callbacks (commands, timers, buttons) stay inside Lua: JavaScript only gets a number for them.
+// (a Lua function that went through JavaScript and back crashes wasmoon when it returns)
+const CALLBACKS = `local _cbs, _cbn = {}, 0
+local function _reg(f) if type(f) ~= "function" then return f end; _cbn = _cbn + 1; _cbs[_cbn] = f; return _cbn end
+do local c, t, w = bridge.command, bridge.timer, bridge.widget
+  bridge.command = function(n, d, f) return c(n, d, _reg(f)) end
+  bridge.timer = function(s, r, f) return t(s, r, _reg(f)) end
+  bridge.widget = function(id, k, a, b, cc) return w(id, k, _reg(a), _reg(b), _reg(cc)) end
+end`;
 class PermErr extends Error {}
 const nn = (v) => (v === null ? undefined : v && typeof v === 'object' && !Array.isArray(v) ? Object.fromEntries(Object.entries(v).filter(([, x]) => x !== null)) : v);
 
@@ -154,7 +163,8 @@ class Host {
     L.global.set('__b', this.bridge(null));
     // Lua's own helpers stay inside Lua (passing them through JavaScript breaks them)
     const prelude = PRELUDE.replace('local bridge, set_hook, clock = ...',
-      "local bridge, set_hook, clock = __b, debug.sethook, os.clock; __b = nil\nlocal _load = load\nbridge.compile = function(src, name) return _load(src, '=' .. name, 't') end")
+      "local bridge, set_hook, clock = __b, debug.sethook, os.clock; __b = nil\nlocal _load = load\nbridge.compile = function(src, name) return _load(src, '=' .. name, 't') end\n" + CALLBACKS)
+      .replace('  call = function(fn, ...) deadline', '  call = function(fn, ...) if type(fn) == "number" then fn = _cbs[fn] end; if type(fn) ~= "function" then return end; deadline')
       .replace('    deadline = math.huge\n    return ok, e end,', "    deadline = math.huge\n    if not ok then bridge.log('error', tostring(e)) end\n    return ok end,")
       .replace('    if not f then return false, err end', "    if not f then bridge.log('error', tostring(err)); return false end");
     this.api = L.doStringSync(prelude);
@@ -372,4 +382,5 @@ class Manager {
 export const addons = new Manager();
 ctx.addons = addons;
 globalThis.smultAddons = addons;   // (handy for debugging in the dev tools)
+globalThis.smultCtx = ctx;
 ctx.net.on((d) => { if (d.t === 'message') addons.onMessage(d.msg); });
