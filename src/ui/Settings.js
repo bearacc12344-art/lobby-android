@@ -12,6 +12,7 @@ import { SEASON_CHOICES, currentSeason, SEASON_ICON } from '../util/sounds.js';
 import { pickFiles, clearFileCache } from '../util/files.js';
 import { prepareAvatar } from '../util/image.js';
 import { isNative, LobbyNative } from '../native.js';
+import { APP_VERSION } from '../version.js';
 
 const PAGES = [
   ['account', '👤', 'My Account'], ['privacy', '🛡️', 'Privacy & Trust'], ['themes', '🖼', 'Themes'], ['appearance', '🎨', 'Appearance'], ['notifications', '🔔', 'Notifications'],
@@ -262,7 +263,8 @@ function Advanced() {
 function About() {
   return html`<${Page} title="About">
     <div class="center" style=${{ margin: '20px 0' }}><${AppLogo} size=${84} /><br /><b style=${{ fontSize: '1.8em', color: 'var(--accent)' }}>SMULT</b>
-      <div class="muted">for Android · v1.0</div></div>
+      <div class="muted">for Android · v${APP_VERSION}</div>
+      <button class="btn" style=${{ marginTop: '10px' }} onClick=${() => import('../util/updates.js').then((m) => m.checkUpdates(true))}>${I('🔄')} ${tr('Check for updates')}</button></div>
     <p>${tr('Smult — made for you and your friends.')}</p>
     <p class="small muted">${tr('Same accounts, chats, groups, calls and community brains as Smult on PC. Peer-to-peer over Nostr relays, end-to-end encrypted, calls go directly between devices (WebRTC).')}</p>
     <p class="small muted">Fonts: LDF Comic Sans (freeware), Comic Neue (OFL), DOORS. Emoji: Twemoji Mozilla (OFL 1.1; artwork © Twitter, CC-BY 4.0).</p>

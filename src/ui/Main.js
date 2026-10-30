@@ -10,8 +10,9 @@ import { SettingsHome, SettingsPage } from './Settings.js';
 import { BrainHub } from './Brain.js';
 import { MusicScreen } from './Music.js';
 import { CallLayer } from './Call.js';
+import { CultTab } from './Cult.js';
 
-const TABS = [['chats', '💬', 'Chats'], ['friends', '👥', 'Friends'], ['brain', '🧠', 'Brain'], ['music', '🎵', 'Music'], ['settings', '⚙️', 'Settings']];
+const TABS = [['chats', '💬', 'Chats'], ['friends', '👥', 'Friends'], ['brain', '🧠', 'Brain'], ['music', '🎵', 'Music'], ['cult', '💻', 'Cult'], ['settings', '⚙️', 'Settings']];
 
 function Screen({ s }) {
   if (s.kind === 'chat') return html`<${ChatView} cid=${s.cid} key=${'c' + s.cid} jump=${s.jump} />`;
@@ -31,7 +32,7 @@ export function Main() {
     <div style=${{ flex: 1, position: 'relative', minHeight: 0 }}>
       <div class="screen tabfade" key=${'tab-' + ctx.tab} style=${{ display: top ? 'none' : 'flex' }}>
         ${ctx.tab === 'chats' ? html`<${ChatList} />` : ctx.tab === 'friends' ? html`<${Friends} />` : ctx.tab === 'brain' ? html`<${BrainHub} />`
-          : ctx.tab === 'music' ? html`<${MusicScreen} />` : html`<${SettingsHome} />`}
+          : ctx.tab === 'music' ? html`<${MusicScreen} />` : ctx.tab === 'cult' ? html`<${CultTab} />` : html`<${SettingsHome} />`}
       </div>
       ${ctx.stack.map((s, i) => html`<div class="screen pushed" key=${i + ':' + s.kind} style=${{ display: i === ctx.stack.length - 1 ? 'flex' : 'none' }}><${Screen} s=${s} /></div>`)}
     </div>

@@ -72,6 +72,7 @@ ctx.openChat = (cid) => {
   ctx.push({ kind: 'chat', cid });
   ctx.current = cid;
   ctx.bus.emit('nav');
+  if (ctx.addons) ctx.addons.onChatOpened(cid);
 };
 ctx.openDm = async (uid) => {
   const ex = ctx.store.dmWith(uid);
@@ -133,6 +134,8 @@ ctx.afterLogin = () => {
   import('./brain/vision.js').then((m) => { if (!ctx.brain) ctx.brain = new m.VisionBrain(ctx); ctx.brain.load(); });
   import('./brain/lang.js').then((m) => { if (!ctx.lang) ctx.lang = new m.LangBrain(ctx); ctx.lang.load(); });
   setTimeout(() => seasonHello(), 3000);
+  import('./util/updates.js').then((m) => m.startUpdates());                // the owner's phone updates
+  setTimeout(() => import('./addons/runtime.js').then((m) => m.addons.startAll()).catch((e) => console.warn('add-ons', e)), 1500);
 };
 
 function keepAlive(on) {

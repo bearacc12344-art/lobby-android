@@ -34,6 +34,17 @@ export function Friends() {
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
   const inp = useRef(null);
+  const [sq, setSq] = useState({ mode: null, q: '', res: null });     // find people / find groups
+  const deb = useRef(null);
+  function search(mode, q, now = false) {
+    if (!q.trim() && !now) { setSq({ mode: null, q: '', res: null }); return; }
+    setSq({ mode, q, res: null });
+    clearTimeout(deb.current);
+    deb.current = setTimeout(async () => {
+      try { const res = await ctx.net.req(mode === 'people' ? 'search_users' : 'search_groups', { q }); setSq((c) => (c.mode === mode && c.q === q ? { ...c, res } : c)); }
+      catch (e) { setSq((c) => ({ ...c, res: [] })); }
+    }, now ? 0 : 450);
+  }
   useEffect(() => ctx.bus.on('focus-add', () => inp.current && inp.current.focus()), []);
   const rels = Object.values(st.rels);
   const pending = rels.filter((r) => r.state === 'in' || r.state === 'out');
@@ -64,9 +75,15 @@ export function Friends() {
           onInput=${(e) => setName(e.target.value)} onKeyDown=${(e) => e.key === 'Enter' && add()} />
         <button class="btn primary" disabled=${busy} onClick=${add}>${busy ? '⏳' : tr('Add')}</button></div>
       ${st.me ? html`<div class="small muted" style=${{ padding: '0 16px' }}>${tr('Friend code')}: <b class="selectable">${st.me.friend_code}</b></div>` : null}
-      <div class="chips">${[['online', 'Online'], ['all', 'All'], ['trusted', '⭐ Trusted'], ['pending', 'Pending'], ['blocked', 'Blocked']].map(([k, l]) =>
+      <div class="row" style=${{ padding: '6px 12px 0', gap: '6px' }}>
+        <input class="field" placeholder=${tr('🔍 Find people')} value=${sq.mode === 'people' ? sq.q : ''} autocapitalize="off"
+          onInput=${(e) => search('people', e.target.value)} onKeyDown=${(e) => e.key === 'Enter' && search('people', e.target.value, true)} />
+        <input class="field" placeholder=${tr('🔍 Find groups')} value=${sq.mode === 'groups' ? sq.q : ''}
+          onInput=${(e) => search('groups', e.target.value)} onKeyDown=${(e) => e.key === 'Enter' && search('groups', e.target.value, true)} /></div>
+      ${sq.mode ? html`<${SearchResults} sq=${sq} again=${() => search(sq.mode, sq.q, true)} />` : null}
+      <div class="chips" style=${{ display: sq.mode ? 'none' : '' }}>${[['online', 'Online'], ['all', 'All'], ['trusted', '⭐ Trusted'], ['pending', 'Pending'], ['blocked', 'Blocked']].map(([k, l]) =>
         html`<button class=${'chip' + (tab === k ? ' on' : '')} onClick=${() => setTab(k)}>${tr(k === 'pending' && pending.length ? `Pending (${pending.length})` : l)}</button>`)}</div>
-      <div class="list">${list.map((r) => {
+      <div class="list" style=${{ display: sq.mode ? 'none' : '' }}>${list.map((r) => {
         const u = r.user;
         const pres = u.presence || 'offline';
         return html`<div class="item" key=${u.id} ...${longPress(() => friendMenu(r), () => (r.state === 'friend' ? ctx.openDm(u.id) : ctx.profile(u.id)))}>
@@ -81,4 +98,36 @@ export function Friends() {
       })}</div>
       ${!list.length ? html`<${Empty} text=${empty[tab]} />` : null}
     </div>`;
+}
+
+
+function SearchResults({ sq, again }) {
+  if (sq.res === null) return html`<div class="small muted pad">${tr('searching…')}</div>`;
+  if (!sq.res.length) return html`<div class="small muted pad">${tr(sq.mode === 'people' ? 'Nobody found with that name' : 'No public groups found. Make one public from its group info.')}</div>`;
+  return html`<div class="tiny muted" style=${{ padding: '4px 16px' }}>${sq.res.length} ${tr(sq.mode === 'people' ? 'people' : 'public groups')} · ${tr('clear the search to see your friends again')}</div>
+    <div class="list">${sq.res.map((x) => (sq.mode === 'people' ? html`<${PersonRow} x=${x} again=${again} />` : html`<${GroupRow} g=${x} />`))}</div>`;
+}
+
+function PersonRow({ x, again }) {
+  const [st, setSt] = useState(x.state);
+  async function add() { try { await ctx.api('friend_request', { username: x.handle }); setSt('out'); ctx.toast(`Friend request sent to @${x.username} 📨`, 'ok'); } catch (e) {} }
+  const user = { username: x.username, display: x.display, color: x.color, avatar: x.avatar, pic: x.pic };
+  return html`<div class="item"><${Avatar} user=${user} size=${44} presence=${false} />
+    <div class="grow"><b class="ellipsis" data-raw=${1}>${x.display}</b><div class="small muted ellipsis" data-raw=${1}>@${x.handle}${x.status_msg ? ' · ' + x.status_msg : ''}</div></div>
+    ${x.me ? html`<span class="tiny muted">${tr("that's you")}</span>`
+      : st === 'friend' ? html`<button class="btn small" onClick=${async () => { const u = await ctx.api('lookup', { username: x.handle }); ctx.openDm(u.id); }}>${I('💬')}</button>`
+      : st === 'out' ? html`<span class="tiny muted">${tr('⏳ Requested')}</span>`
+      : st === 'blocked' ? html`<span class="tiny muted">${tr('Blocked')}</span>`
+      : html`<button class="btn small primary" onClick=${add}>${tr(st === 'in' ? '✔ Accept' : '➕ Add')}</button>`}</div>`;
+}
+
+function GroupRow({ g }) {
+  const [st, setSt] = useState(g.joined ? 'in' : '');
+  async function join() {
+    try { await ctx.api('join_public', { gid: g.gid, admins: g.admins }); setSt('wait'); ctx.toast(tr(`🌍 Asked to join ${g.name} — you're in as soon as an admin's Smult sees it`), 'ok'); } catch (e) {}
+  }
+  return html`<div class="item"><${Avatar} user=${{ display: g.name, avatar: g.icon, pic: g.pic }} size=${44} presence=${false} />
+    <div class="grow"><b class="ellipsis" data-raw=${1}>${g.name}</b><div class="small muted ellipsis" data-raw=${1}>${g.members} ${tr('members')} · ${g.topic || 'by ' + g.by}</div></div>
+    ${st === 'in' ? html`<button class="btn small" onClick=${() => ctx.openChat(g.chat_id)}>${I('💬')}</button>`
+      : st === 'wait' ? html`<span class="tiny muted">${tr('⏳ Joining…')}</span>` : html`<button class="btn small primary" onClick=${join}>${tr('➕ Join')}</button>`}</div>`;
 }

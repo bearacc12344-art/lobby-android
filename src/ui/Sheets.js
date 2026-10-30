@@ -171,7 +171,8 @@ function GroupSheet({ s }) {
         <input class="field grow" placeholder=${tr('Topic')} value=${topic} onInput=${(e) => setTopic(e.target.value)} /></div>
       <div class="row wrap"><button class="btn" onClick=${() => pickGroupPhoto(c)}>${I('🖼')} ${tr('Change group photo')}</button>
         ${c.pic || c.pic_url ? html`<button class="btn" onClick=${() => ctx.api('group_update', { chat_id: c.id, pic: '' })}>${tr('Remove photo')}</button>` : null}</div>
-      <button class="btn primary" onClick=${() => ctx.api('group_update', { chat_id: c.id, name, icon, topic }).then(() => ctx.toast('Saved', 'ok'))}>${tr('Save changes')}</button></div>` : null}
+      <button class="btn primary" onClick=${() => ctx.api('group_update', { chat_id: c.id, name, icon, topic }).then(() => ctx.toast('Saved', 'ok'))}>${tr('Save changes')}</button>
+      <${PublicToggle} cid=${c.id} /></div>` : null}
     <div class="section">${tr(`${c.members.length} members`)}</div>
     ${c.members.map((m) => html`<div class="row" style=${{ padding: '6px 0' }} onClick=${() => memberMenu(m)}>
       <${Avatar} user=${st.users[m.id]} size=${40} /><div class="grow"><div>${st.name(m.id)}${m.id === st.myId ? tr('  (you)') : ''}</div>
@@ -315,4 +316,15 @@ export function Sheets() {
     return html`<div class=${'backdrop' + (mid ? ' mid' : '')} key=${i} onClick=${(e) => e.target === e.currentTarget && cancel()}>
       ${mid ? inner : html`<div class=${'sheet' + (FULL.has(s.kind) ? ' full' : '')}>${FULL.has(s.kind) ? null : html`<div class="grab"></div>`}${inner}</div>`}</div>`;
   })}`;
+}
+
+
+function PublicToggle({ cid }) {
+  const [on, setOn] = useState(null);
+  useEffect(() => { ctx.net.req('group_is_public', { chat_id: cid }).then((r) => setOn(r.on)).catch(() => {}); }, [cid]);
+  return html`<label class="row" style=${{ gap: '8px', marginTop: '6px' }}><span class="grow small">${I('🌍')} ${tr('Public group: anyone can find it in "Find groups" and join')}</span>
+    <input type="checkbox" disabled=${on === null} checked=${!!on} onChange=${async (e) => {
+      const v = e.target.checked;
+      try { const r = await ctx.api('group_public', { chat_id: cid, on: v }); setOn(r.on); ctx.toast(r.on ? '🌍 The group is public now' : '🔒 The group is private again', 'ok'); } catch (x) { e.target.checked = !v; }
+    }} /></label>`;
 }

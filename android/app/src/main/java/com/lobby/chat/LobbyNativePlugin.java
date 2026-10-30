@@ -189,6 +189,38 @@ public class LobbyNativePlugin extends Plugin {
         }
     }
 
+    // a new Smult (sent by the Smult owner): hand the .apk to Android's installer
+    @PluginMethod
+    public void installApk(PluginCall call) {
+        pool.execute(() -> {
+            try {
+                File dir = new File(getContext().getCacheDir(), "update");
+                dir.mkdirs();
+                File f = new File(dir, "Smult_update.apk");
+                try (OutputStream o = new FileOutputStream(f)) { o.write(Base64.decode(call.getString("data", ""), Base64.DEFAULT)); }
+                if (Build.VERSION.SDK_INT >= 26 && !getContext().getPackageManager().canRequestPackageInstalls()) {
+                    // Android asks once: "allow Smult to install updates?"
+                    Intent s = new Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                            Uri.parse("package:" + getContext().getPackageName())).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    getContext().startActivity(s);
+                    JSObject r = new JSObject();
+                    r.put("needsPermission", true);
+                    call.resolve(r);
+                    return;
+                }
+                Uri uri = FileProvider.getUriForFile(getContext(), getContext().getPackageName() + ".fileprovider", f);
+                Intent i = new Intent(Intent.ACTION_VIEW).setDataAndType(uri, "application/vnd.android.package-archive")
+                        .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
+                getContext().startActivity(i);
+                JSObject r = new JSObject();
+                r.put("needsPermission", false);
+                call.resolve(r);
+            } catch (Exception e) {
+                call.reject(String.valueOf(e.getMessage()));
+            }
+        });
+    }
+
     @PluginMethod
     public void deleteFile(PluginCall call) {
         String path = call.getString("path", "");

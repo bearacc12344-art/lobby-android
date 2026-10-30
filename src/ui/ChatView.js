@@ -291,6 +291,8 @@ function Composer({ chat, reply, setReply, edit, setEdit, onSent }) {
     }
     let sil = silent;
     if (t.startsWith('/')) {
+      const [cmd, ...rest] = t.split(' ');                     // add-on commands (CommandService:Register) come first
+      if (ctx.addons && ctx.addons.commands()[cmd.toLowerCase()] && ctx.addons.runCommand(cmd.toLowerCase(), rest.join(' '), chat.id)) { setText(''); return; }
       const r = slash(t);
       if (r === true) { setText(''); return; }
       [t, sil] = [r[0], r[1] || silent];

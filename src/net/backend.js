@@ -14,6 +14,9 @@ const STUN = ['stun:stun.l.google.com:19302', 'stun:stun.cloudflare.com:3478'];
 
 export const K_DIRECT = 4444, K_GROUP = 4445, K_EPH = 24444, K_GEPH = 24445, K_REPL = 30078, K_AUTH = 24242;
 export const K_BRAIN = 4446, K_LANG = 4447, K_STATUS = 4448;   // 4448: 24h status posts, encrypted to each friend
+export const K_JOIN = 4449, K_WSACT = 4458, K_ADDON = 34551, K_PUBGROUP = 34552, K_UPDATE = 34553;  // same as PC Smult
+const D_UPDATE_PHONE = 'smult-android';
+const WS_INLINE = 40 * 1024, WS_MAX = 2 * 1024 * 1024;
 const STATUS_TTL = 24 * 3600;
 export const D_PROFILE = 'lobby-profile', D_STATE = 'lobby-state', D_BRAIN = 'lobby-brain-ckpt', D_LANG = 'lobby-lang-ckpt';
 const LANG_CHUNK_MAX = 8000;
@@ -395,6 +398,9 @@ export class Backend {
     f.push({ kinds: [K_REPL], '#d': [D_LANG], limit: 60 });
     f.push({ kinds: [K_STATUS], '#p': [this.k.pub], since: Math.floor(now()) - STATUS_TTL });
     f.push({ kinds: [K_STATUS], authors: [this.k.pub], since: Math.floor(now()) - STATUS_TTL });
+    f.push({ kinds: [K_JOIN], '#p': [this.k.pub], since: Math.max(since, Math.floor(now()) - 14 * 86400) });   // public-group joins
+    const root = this.bstate()[0];
+    if (root) f.push({ kinds: [K_UPDATE], authors: [root], '#d': [D_UPDATE_PHONE] });                     // new phone versions
     const g = this.gids();
     if (g.length) {
       f.push({ kinds: [K_GROUP], '#g': g, since, limit: 5000 });
@@ -430,6 +436,11 @@ export class Backend {
   async process(ev, live = null) {
     live = live === null ? !this.syncing : live;
     const k = ev.kind;
+    if (k === K_JOIN) return this.applyJoinRequest(ev);
+    if (k === K_UPDATE) {
+      if (ev.pubkey === this.bstate()[0] && tag(ev, 'd') === D_UPDATE_PHONE) { const info = this.updateInfo(ev); if (info) this.emit({ t: 'update_available', info }); }
+      return;
+    }
     if (k === K_STATUS) return this.applyStatus(ev, live);
     if (k === K_BRAIN) return this.applyBrainEx(ev, live);
     if (k === K_LANG) return this.applyLangTxt(ev, live);
@@ -809,7 +820,8 @@ export class Backend {
   applyInvite(author, pl, live) {
     const gid = pl.gid;
     if (!gid || !/^[0-9a-f]{32}$/.test(gid)) return;
-    if (author !== this.me) {
+    const asked = gid in (this.kv('join_wait', {}) || {});         // a public group I asked to join
+    if (author !== this.me && !asked) {
       if (!this.isFriend(author)) return;
       if (this.privacy().group_invites === 'trusted' && !this.trusted(author)) return;
     }
@@ -1227,6 +1239,258 @@ export class Backend {
     this.applyChatOp(cid, this.me, { ...pl }, true);
     await this.sendChat(cid, pl);
   }
+  // ------------------------------------------------------------------ find people (everyone who opened Smult)
+  async on_search_users(d) {
+    const q = String(d.q || '').trim().toLowerCase().replace(/^@/, '');
+    const qn = q.split('#')[0];
+    const flt = [{ kinds: [K_REPL], '#d': [D_PROFILE], '#t': ['lobby'], limit: 500 }];
+    if (/^[a-z0-9_.]{3,20}$/.test(qn)) flt.push({ kinds: [K_REPL], '#d': [D_PROFILE], '#u': [qn] });
+    const evs = await this.pool.query(flt, 5000);
+    const latest = {};
+    for (const e of evs) if (!latest[e.pubkey] || latest[e.pubkey].created_at < e.created_at) latest[e.pubkey] = e;
+    const out = [];
+    for (const [pk, e] of Object.entries(latest)) {
+      let b;
+      try { b = JSON.parse(e.content); } catch (x) { continue; }
+      const un = String(b.username || '').slice(0, 20), disp = String(b.display || '').slice(0, 40);
+      if (!/^[A-Za-z0-9_.]{3,20}$/.test(un)) continue;
+      if (qn && !(un + ' ' + disp).toLowerCase().includes(qn)) continue;
+      const r = this.q1('SELECT u.id, r.state FROM users u LEFT JOIN relations r ON r.user_id=u.id WHERE u.pubkey=?', pk);
+      out.push({ username: un, display: disp || un, code: pk.slice(0, 4), handle: `${un}#${pk.slice(0, 4)}`, color: String(b.color || '').slice(0, 9),
+        avatar: String(b.avatar || '').slice(0, 16), pic: String(b.pic || '').slice(0, 48000), bio: String(b.bio || '').slice(0, 200),
+        status_msg: String(b.status_msg || '').slice(0, 120), me: pk === this.k.pub, state: (r && r.state) || '', seen: e.created_at });
+    }
+    out.sort((a, b) => ((qn && b.username.toLowerCase() === qn) - (qn && a.username.toLowerCase() === qn)) || b.seen - a.seen);
+    return out.slice(0, 80);
+  }
+
+  // ------------------------------------------------------------------ public groups (same events as PC Smult)
+  publicGids() { return this.kv('pub_groups', {}) || {}; }
+  async publishGroupListing(cid, deleted = false) {
+    const c = this.chat(cid);
+    const gid = c.ckey.slice(2);
+    const mem = this.q('SELECT m.role, u.pubkey FROM members m JOIN users u ON u.id=m.user_id WHERE m.chat_id=?', cid);
+    const admins = mem.filter((m) => ['owner', 'admin'].includes(m.role)).map((m) => m.pubkey).slice(0, 12);
+    const body = deleted ? { deleted: true } : { name: (c.name || '').slice(0, 48), icon: (c.icon || '').slice(0, 16), topic: (c.topic || '').slice(0, 200),
+      members: mem.length, admins, pic: (c.pic || '').slice(0, 30000), by: this.name(this.me) };
+    const tags = [['d', gid], ['t', 'smult-group']];
+    if (!deleted) tags.push(['n', (c.name || '').slice(0, 48).toLowerCase()]);
+    await this.pool.publish(this.k.sign(K_PUBGROUP, tags, JSON.stringify(body)));
+  }
+  async on_group_public(d) {
+    const cid = parseInt(d.chat_id, 10), on = !!d.on;
+    if (!['owner', 'admin'].includes(this.role(cid, this.me))) throw new Err('Only group admins can do that');
+    const gid = this.chat(cid).ckey.slice(2);
+    const pg = this.publicGids();
+    if (on) pg[gid] = Math.floor(now()); else delete pg[gid];
+    this.setKv('pub_groups', pg);
+    await this.publishGroupListing(cid, !on);
+    await this.postSystem(cid, `${this.name(this.me)} made the group ` + (on ? 'public: anyone can find and join it' : 'private again'));
+    return { on };
+  }
+  async on_group_is_public(d) { return { on: this.chat(parseInt(d.chat_id, 10)).ckey.slice(2) in this.publicGids() }; }
+  async on_search_groups(d) {
+    const q = String(d.q || '').trim().toLowerCase();
+    const evs = await this.pool.query([{ kinds: [K_PUBGROUP], '#t': ['smult-group'], limit: 500 }], 5000);
+    const latest = {};
+    for (const e of evs) { const key = e.pubkey + ':' + tag(e, 'd'); if (!latest[key] || latest[key].created_at < e.created_at) latest[key] = e; }
+    const byGid = {};
+    for (const e of Object.values(latest)) {
+      const gid = tag(e, 'd') || '';
+      let b;
+      try { b = JSON.parse(e.content); } catch (x) { continue; }
+      if (!/^[0-9a-f]{32}$/.test(gid) || b.deleted || !(b.admins || [e.pubkey]).includes(e.pubkey)) continue;
+      if (byGid[gid] && byGid[gid].created >= e.created_at) continue;
+      if (q && !(String(b.name || '') + ' ' + String(b.topic || '')).toLowerCase().includes(q)) continue;
+      const mine = this.q1('SELECT id, left FROM chats WHERE ckey=?', 'g:' + gid);
+      byGid[gid] = { gid, name: String(b.name || 'group').slice(0, 48), icon: String(b.icon || '').slice(0, 16), topic: String(b.topic || '').slice(0, 200),
+        members: parseInt(b.members || 0, 10), admins: (b.admins || []).filter((a) => typeof a === 'string' && a.length === 64).slice(0, 12),
+        pic: String(b.pic || '').slice(0, 30000), by: String(b.by || '').slice(0, 40), created: e.created_at,
+        joined: !!(mine && !mine.left), chat_id: mine && !mine.left ? mine.id : null };
+    }
+    return Object.values(byGid).sort((a, b) => b.members - a.members || b.created - a.created).slice(0, 80);
+  }
+  async on_join_public(d) {
+    const gid = String(d.gid || '');
+    const admins = (d.admins || []).filter((a) => /^[0-9a-f]{64}$/.test(a)).slice(0, 12);
+    if (!/^[0-9a-f]{32}$/.test(gid) || !admins.length) throw new Err("That group can't be joined");
+    const wait = this.kv('join_wait', {}) || {};
+    wait[gid] = Math.floor(now());
+    this.setKv('join_wait', wait);
+    const me = this.q1('SELECT username, display FROM users WHERE id=?', this.me);
+    for (const a of admins) {
+      const ev = this.k.sign(K_JOIN, [['p', a]], await enc(this.k.shared(a), { gid, username: me.username, display: me.display }));
+      await this.pool.publish(ev);
+    }
+    return true;
+  }
+  async applyJoinRequest(ev) {
+    const author = ev.pubkey;
+    if (author === this.k.pub) return;
+    let b;
+    try { b = await dec(this.k.shared(author), ev.content); } catch (e) { return; }
+    const gid = String(b.gid || '');
+    if (!(gid in this.publicGids())) return;
+    const c = this.q1('SELECT id FROM chats WHERE ckey=? AND left=0', 'g:' + gid);
+    if (!c || !['owner', 'admin'].includes(this.role(c.id, this.me))) return;
+    const done = this.kv('joins_done', {}) || {};
+    const key = `${gid}:${author}`;
+    if (done[key]) return;
+    done[key] = Math.floor(now());
+    this.setKv('joins_done', Object.fromEntries(Object.entries(done).slice(-2000)));
+    const u = this.uid(author);
+    const un = String(b.username || '').slice(0, 20);
+    if (/^[A-Za-z0-9_.]{3,20}$/.test(un)) {
+      this.x("UPDATE users SET username=COALESCE(NULLIF(username,''), ?), display=CASE WHEN display LIKE 'user %' THEN ? ELSE display END WHERE id=?",
+        un, String(b.display || un).slice(0, 40), u);
+    }
+    if (this.role(c.id, u)) return;
+    try {
+      const pl = { type: 'meta', op: 'add', pub: this.pub(u) };
+      this.applyMeta(c.id, this.me, { ...pl, ms: ms() }, true);
+      await this.sendGroup(c.id, pl);
+      await this.inviteAll(c.id, [u]);
+      await this.postSystem(c.id, `${this.name(u)} joined (public group)`);
+      await this.publishGroupListing(c.id);
+    } catch (e) { /* try again next time */ }
+  }
+
+  // ------------------------------------------------------------------ the Workshop (community add-ons; same as PC)
+  wsAdmins() { const root = this.bstate()[0]; return new Set(root ? [root] : []); }
+  wsOwner(aid, events = []) {
+    const owners = this.kv('ws_owners', {}) || {};
+    if (owners[aid]) return owners[aid];
+    const admins = this.wsAdmins();
+    let c = events.filter((e) => tag(e, 'd') === aid && !admins.has(e.pubkey));
+    if (!c.length) c = events.filter((e) => tag(e, 'd') === aid);
+    if (!c.length) return null;
+    const first = (e) => { try { return parseInt(JSON.parse(e.content).first || e.created_at, 10); } catch (x) { return e.created_at; } };
+    c.sort((a, b) => first(a) - first(b) || a.created_at - b.created_at);
+    owners[aid] = c[0].pubkey;
+    this.setKv('ws_owners', owners);
+    return c[0].pubkey;
+  }
+  async on_workshop_publish(d) {
+    const raw = d.zip instanceof Uint8Array ? d.zip : unb64(d.zip || '');
+    const man = d.manifest || {};
+    const aid = String(man.id || '');
+    if (!raw.length || raw.length > WS_MAX) throw new Err('The add-on must be under 2 MB');
+    if (!/^\{?[0-9A-Fa-f-]{36}\}?$/.test(aid)) throw new Err("The add-on's id must be a GUID (made automatically for new projects)");
+    const prev = await this.pool.query([{ kinds: [K_ADDON], '#d': [aid] }], 5000);
+    const owner = this.wsOwner(aid, prev);
+    if (owner && owner !== this.k.pub && !this.wsAdmins().has(this.k.pub)) {
+      throw new Err('This add-on belongs to someone else on the Workshop - only its owner (or the Smult owner) can upload new versions. Make your own copy: it gets a new id.');
+    }
+    let first = Math.floor(now());
+    for (const e of prev.filter((x) => x.pubkey === this.k.pub)) { try { first = Math.min(first, parseInt(JSON.parse(e.content).first || e.created_at, 10)); } catch (x) {} }
+    const meta = {};
+    for (const k of ['id', 'name', 'version', 'author', 'description', 'icon', 'permissions']) meta[k] = man[k];
+    const body = { m: meta, size: raw.length, sha256: sha256hex(raw), notes: String(d.notes || '').slice(0, 1000),
+      tags: (d.tags || []).map((t) => String(t).slice(0, 20)).slice(0, 6), by: this.name(this.me), first };
+    if (!owner) { const o = this.kv('ws_owners', {}) || {}; o[aid] = this.k.pub; this.setKv('ws_owners', o); }
+    if (raw.length <= WS_INLINE) body.inline = b64(raw); else body.url = await this.upload(raw);
+    const ev = this.k.sign(K_ADDON, [['d', aid], ['t', 'smult-workshop'], ['n', String(meta.name || '').slice(0, 40).toLowerCase()]], JSON.stringify(body));
+    await this.pool.publish(ev);
+    return { author: this.k.pub, id: aid };
+  }
+  async on_workshop_unpublish(d) {
+    await this.pool.publish(this.k.sign(K_ADDON, [['d', String(d.id || '')], ['t', 'smult-workshop']], JSON.stringify({ deleted: true })));
+    return true;
+  }
+  async on_workshop_list() {
+    const evs = await this.pool.query([{ kinds: [K_ADDON], '#t': ['smult-workshop'], limit: 600 }, { kinds: [K_WSACT], '#t': ['smult-workshop'], limit: 8000 }], 6000);
+    const items = {}, acts = {};
+    for (const e of evs) {
+      if (e.kind === K_ADDON) { const key = e.pubkey + ':' + (tag(e, 'd') || ''); if (!items[key] || items[key].created_at < e.created_at) items[key] = e; }
+      else if (e.kind === K_WSACT) {
+        const k2 = [tag(e, 'a') || '', e.pubkey, ['like', 'unlike'].includes(e.content)].join('|');
+        if (!acts[k2] || acts[k2].created_at < e.created_at) acts[k2] = e;
+      }
+    }
+    const likes = {}, installs = {}, liked = new Set();
+    for (const [k2, e] of Object.entries(acts)) {
+      const [a, pk, isLike] = k2.split('|');
+      if (isLike === 'true') { if (e.content === 'like') { likes[a] = (likes[a] || 0) + 1; if (pk === this.k.pub) liked.add(a); } }
+      else if (e.content === 'install') installs[a] = (installs[a] || 0) + 1;
+    }
+    const admins = this.wsAdmins(), all = Object.values(items), best = {};
+    for (const e of all) {
+      const aid = tag(e, 'd') || '';
+      const owner = this.wsOwner(aid, all);
+      if (e.pubkey !== owner && !admins.has(e.pubkey)) continue;
+      if (!best[aid] || best[aid][1].created_at < e.created_at) best[aid] = [owner + ':' + aid, e];
+    }
+    const out = [];
+    for (const [okey, e] of Object.values(best)) {
+      let b;
+      try { b = JSON.parse(e.content); } catch (x) { continue; }
+      const m = b.m;
+      if (b.deleted || !m || typeof m !== 'object') continue;
+      const owner = okey.split(':')[0];
+      out.push({ key: okey, author: e.pubkey, owner, by_admin: e.pubkey !== owner, code: owner.slice(0, 4), by: String(b.by || '').slice(0, 40),
+        id: String(m.id || '').slice(0, 40), name: String(m.name || 'add-on').slice(0, 40), version: String(m.version || '1.0').slice(0, 16),
+        description: String(m.description || '').slice(0, 300), icon: String(m.icon || '🧩').slice(0, 4),
+        permissions: (m.permissions || []).map((p) => String(p).slice(0, 16)).slice(0, 12), size: parseInt(b.size || 0, 10),
+        notes: String(b.notes || '').slice(0, 1000), tags: (b.tags || []).map((t) => String(t).slice(0, 20)).slice(0, 6), updated: e.created_at,
+        likes: likes[okey] || 0, installs: installs[okey] || 0, liked: liked.has(okey), mine: owner === this.k.pub });
+    }
+    return out;
+  }
+  async on_workshop_get(d) {
+    const author = String(d.author || ''), aid = String(d.id || '');
+    const owner = this.wsOwner(aid);
+    if (owner && author !== owner && !this.wsAdmins().has(author)) throw new Err("That upload isn't from the add-on's owner - not installing it");
+    const evs = await this.pool.query([{ kinds: [K_ADDON], authors: [author], '#d': [aid] }], 6000);
+    if (!evs.length) throw new Err("Couldn't find that add-on on the relays right now");
+    const e = evs.sort((a, b) => b.created_at - a.created_at)[0];
+    const b = JSON.parse(e.content);
+    if (b.deleted) throw new Err('The author removed that add-on');
+    let raw;
+    if (b.inline) raw = unb64(b.inline);
+    else {
+      if (!String(b.url || '').startsWith('https://')) throw new Err('Broken add-on link');
+      raw = await httpGet(b.url);
+    }
+    if (raw.length > WS_MAX || sha256hex(raw) !== b.sha256) throw new Err("The download doesn't match what the author published - not installing it");
+    return { zip: raw, version: String((b.m || {}).version || '') };
+  }
+  async on_workshop_act(d) {
+    const act = String(d.act || '');
+    if (!['like', 'unlike', 'install'].includes(act)) throw new Err('bad action');
+    await this.pool.publish(this.k.sign(K_WSACT, [['a', String(d.key || '').slice(0, 120)], ['t', 'smult-workshop']], act));
+    return true;
+  }
+
+  // ------------------------------------------------------------------ phone updates (the Smult owner sends an APK from PC Smult)
+  updateInfo(ev) {
+    try {
+      const b = JSON.parse(ev.content);
+      return { version: String(b.version).slice(0, 20), notes: String(b.notes || '').slice(0, 2000), size: parseInt(b.size || 0, 10), sha256: String(b.sha256),
+        urls: (b.urls || [b.url]).filter((u) => typeof u === 'string').slice(0, 6), by: String(b.by || '').slice(0, 40), created: ev.created_at };
+    } catch (e) { return null; }
+  }
+  async latestUpdate() {
+    const root = this.bstate()[0];
+    if (!root) return null;
+    const evs = (await this.pool.query([{ kinds: [K_UPDATE], authors: [root], '#d': [D_UPDATE_PHONE] }], 6000)).filter((e) => e.pubkey === root);
+    if (!evs.length) return null;
+    return this.updateInfo(evs.sort((a, b) => b.created_at - a.created_at)[0]);
+  }
+  async on_update_check() { return this.latestUpdate(); }
+  async on_update_download() {
+    const info = await this.latestUpdate();
+    if (!info) throw new Err('No update found');
+    const errs = [];
+    for (const u of info.urls.filter((x) => x.startsWith('https://'))) {
+      try {
+        const raw = await httpGet(u);
+        if (sha256hex(raw) === info.sha256) return { bytes: raw, version: info.version };
+        errs.push(u.split('/')[2] + ": the file didn't match");
+      } catch (e) { errs.push(u.split('/')[2] + ': ' + (e.message || e)); }
+    }
+    throw new Err("Couldn't download the update: " + errs.join('; ').slice(0, 300));
+  }
+
   async on_group_update(d) {
     const cid = parseInt(d.chat_id, 10);
     if (!['owner', 'admin'].includes(this.role(cid, this.me))) throw new Err('Only group admins can do that');
