@@ -396,7 +396,7 @@ export class Backend {
       { kinds: [K_DIRECT], '#p': [this.k.pub], since, limit: 5000 },
       { kinds: [K_DIRECT], authors: [this.k.pub], since, limit: 5000 },
       { kinds: [K_REPL], authors: known.slice(0, 500), '#d': [D_PROFILE, D_STATE] },
-      { kinds: [K_EPH], '#p': [this.k.pub], since: Math.floor(now()) - 20 },
+      { kinds: [K_EPH], '#p': [this.k.pub], since: Math.floor(now()) - 300 },
       { kinds: [K_REPL], '#d': [badges.D_BADGES], limit: 300 },
       { kinds: [K_REPL], '#d': [D_PROFILE], '#u': [badges.ADMIN_USERNAME.toLowerCase()], limit: 50 },
     ];
@@ -414,7 +414,7 @@ export class Backend {
     const g = this.gids();
     if (g.length) {
       f.push({ kinds: [K_GROUP], '#g': g, since, limit: 5000 });
-      f.push({ kinds: [K_GEPH], '#g': g, since: Math.floor(now()) - 20 });
+      f.push({ kinds: [K_GEPH], '#g': g, since: Math.floor(now()) - 300 });
     }
     const prio = { [K_DIRECT]: 0, [K_GROUP]: 1, [K_GEPH]: 2, [K_EPH]: 3, [K_REPL]: 4 };   // most important in the first REQ
     f.sort((a, b) => (prio[a.kinds[0]] ?? 9) - (prio[b.kinds[0]] ?? 9));
@@ -492,7 +492,7 @@ export class Backend {
       if (this.blocked(author)) return;
       this.applyChatOp(c.id, author, pl, live);
     } else if (k === K_EPH || k === K_GEPH) {
-      if (now() - ev.created_at > 60 || ev.pubkey === this.k.pub) return;
+      if (Math.abs(now() - ev.created_at) > 300 || ev.pubkey === this.k.pub) return;   // (their clock may be off)
       const author = this.uid(ev.pubkey);
       if (this.blocked(author)) return;
       let pl, cid = null;
@@ -905,7 +905,8 @@ export class Backend {
       let fid = null;
       if (file) fid = sha256hex(te.encode(String(file.url || file.inline || (Array.isArray(file.parts) ? file.parts[0] || '' : '')).slice(0, 4096) + String(file.k || ''))).slice(0, 32);
       const created = Math.floor(mid / 4096) / 1000;
-      const shown = created <= now() + 5 ? 1 : 0;
+      // only scheduled messages wait; a sender whose clock runs fast mustn't make their messages show up minutes late
+      const shown = created <= now() + 5 || (!pl.sched && created <= now() + 600) ? 1 : 0;
       const reply = pl.reply_to;
       this.x('INSERT INTO messages(id, chat_id, sender, kind, body, reply_to, created, file, fid, silent, shown) VALUES(?,?,?,?,?,?,?,?,?,?,?)',
         mid, cid, author, kind, String(pl.body ?? '').slice(0, 8000), reply ? parseInt(reply, 10) : null, created,
@@ -1636,7 +1637,10 @@ export class Backend {
     const body = String(d.body || '').slice(0, 8000);
     const pl = { type: 'msg', kind: 'text', body };
     const at = parseFloat(d.send_at || 0);
-    pl.mid = newMid(at ? Math.floor(at * 1000) : ms());
+    if (at) pl.sched = 1;                             // scheduled: hidden until then (on every device)
+    // otherwise always after the newest message I've seen, even if my clock is behind theirs
+    const top = at ? null : this.q1('SELECT MAX(id) AS m FROM messages WHERE chat_id=? AND shown=1', cid);
+    pl.mid = newMid(at ? Math.floor(at * 1000) : Math.max(ms(), Math.floor((top && top.m || 0) / 4096) + 1));
     pl.ms = ms();
     if (d.file && d.file.reuse && typeof d.file.reuse === 'object') {
       // a sticker that was sent before: send the same encrypted file again, nothing to upload
