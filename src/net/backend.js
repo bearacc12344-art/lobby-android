@@ -780,6 +780,10 @@ export class Backend {
   }
   applyDirect(author, other, pl, live) {
     const t = pl.type;
+    if (t === 'call_ring_later') {                     // I was rung while offline
+      if (author !== this.me && now() - (parseFloat(pl.at) || 0) < 600) fire(this.ringFromLater(author, pl));
+      return;
+    }
     if (live && !this.q1('SELECT username FROM users WHERE id=?', other).username) fire(this.fetchProfile(other));
     const ts = (pl.ms || 0) / 1000;
     const mine = author === this.me;
@@ -2130,8 +2134,10 @@ export class Backend {
     const c = this.getCall(hex(randBytes(8)), cid, now(), this.me);
     this.myCall = c.gcid;
     this.myState = { muted: false, deaf: false, cam: false, screen: false };
-    for (const u of this.callAudience(c)) if (this.presenceOf(u) !== 'offline') c.ringing.set(u, now());
+    const aud = this.callAudience(c);
+    for (const u of aud) c.ringing.set(u, now());     // everyone rings (a phone in the background can look offline)
     await this.callSignal(c, { type: 'call_ring', video: !!d.video });
+    await this.ringLater(c, aud.filter((u) => this.presenceOf(u) === 'offline'), !!d.video);
     await this.callSignal(c, { type: 'call_presence', st: this.presenceSt() });
     this.callChanged(c);
     this.pushUser(this.me);
@@ -2208,8 +2214,25 @@ export class Backend {
     if (c.parts.has(u)) throw new Err('Already in the call');
     c.ringing.set(u, now());
     await this.callSignal(c, { type: 'call_ring', video: false }, [u]);
+    if (this.presenceOf(u) === 'offline') await this.ringLater(c, [u], false);
     this.callChanged(c);
     return true;
+  }
+  // people who are offline: a ring that waits on the relays and rings them when they open Smult (if the call is still on)
+  async ringLater(c, uids, video) {
+    if (!uids.length) return;
+    const ckey = this.q1('SELECT ckey FROM chats WHERE id=?', c.chatId).ckey;
+    const pl = { type: 'call_ring_later', cid: c.gcid, chat: ckey.split(':')[0], started: c.started, starter: this.pub(c.starter), video, at: now() };
+    if (ckey.startsWith('g:')) pl.g = ckey.slice(2);
+    for (const u of uids) { try { await this.sendDirect(u, { ...pl }); } catch (e) { console.warn('ring later', e); } }
+  }
+  async ringFromLater(author, pl) {
+    const gcid = pl.cid;
+    if (!gcid || this.myCall === gcid) return;
+    for (let i = 0; i < 12; i++) { await sleep(1000); const c = this.calls.get(gcid); if (c && c.parts.size) break; }
+    const c = this.calls.get(gcid);
+    if (!c || !c.parts.size || this.myCall === gcid || this.rings.has(gcid)) return;   // it ended while I was away
+    await this.applyCallSignal(author, { ...pl, type: 'call_ring', n: undefined }, null);
   }
   rtcConfig() {
     const iceServers = [{ urls: STUN }];
