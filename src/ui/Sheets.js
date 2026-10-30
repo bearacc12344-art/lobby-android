@@ -11,6 +11,7 @@ import { fmtAgo, fmtTime, dayLabel, PRESENCE_LABEL, fmtSize } from '../util/form
 import { getFile, saveFile, fileUrl, extOf, IMAGE_EXT } from '../util/files.js';
 import { Avatar, Badges, ChatAvatar, Switch } from './common.js';
 import { GifPicker } from './Gifs.js';
+import { StickerSheet } from './Stickers.js';
 
 function Menu({ s }) {
   return html`<div class="menu">${s.title ? html`<div class="muted small" style=${{ padding: '2px 6px 8px' }}>${s.title}</div>` : null}
@@ -284,7 +285,7 @@ function MediaSheet({ s }) {
           <span class="emoji">${I(m.kind === 'voice' ? '🎤' : '📎')}</span><span class="grow ellipsis">${m.file.name}</span><span class="tiny muted">${fmtSize(m.file.size)}</span></div>`)}</div>`;
 }
 
-const FULL = new Set(['emoji', 'gif']);
+const FULL = new Set(['emoji', 'gif', 'sticker']);
 
 export function Sheets() {
   useBus(['nav']);
@@ -302,6 +303,7 @@ export function Sheets() {
     else if (s.kind === 'newgroup') inner = html`<${NewGroup} s=${s} />`;
     else if (s.kind === 'emoji') inner = html`<${EmojiSheet} s=${s} />`;
     else if (s.kind === 'gif') inner = html`<${GifPicker} s=${s} />`;
+    else if (s.kind === 'sticker') inner = html`<${StickerSheet} s=${s} />`;
     else if (s.kind === 'poll') inner = html`<${PollSheet} s=${s} />`;
     else if (s.kind === 'schedule') inner = html`<${ScheduleSheet} s=${s} />`;
     else if (s.kind === 'forward') inner = html`<${ForwardSheet} s=${s} />`;

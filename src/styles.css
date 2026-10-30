@@ -346,3 +346,13 @@ html:not(.noanim) .applogo { animation: logoFloat 3.2s ease-in-out infinite; }
 .doors .btn { background: #3a2814; border: 1px solid #c49a4a; color: #f0c674; font-weight: 700; }
 .bigprev { height: 150px; border-radius: 12px; position: relative; overflow: hidden; border: 1px solid #8a6a3a; }
 .bigprev i { position: absolute; border-radius: 7px; }
+
+/* stickers */
+.msg .bub.stk, .has-bg .msg .bub.stk { background: transparent !important; border: 0 !important; box-shadow: none !important; padding: 2px 0; }
+.msg .bub.stk .time { background: color-mix(in srgb, var(--panel2) 80%, transparent); border-radius: 8px; padding: 1px 6px; }
+.sticker img { width: 150px; height: 150px; object-fit: contain; display: block; }
+.sticker > span { display: flex; width: 150px; height: 150px; align-items: center; justify-content: center; font-size: 34px; }
+.sgrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; padding: 4px; }
+.stile { aspect-ratio: 1; background: transparent; border: 0; border-radius: 14px; padding: 6px; }
+.stile:active { background: color-mix(in srgb, var(--accent) 22%, transparent); transform: scale(0.94); }
+.stile img { width: 100%; height: 100%; object-fit: contain; display: block; pointer-events: none; }

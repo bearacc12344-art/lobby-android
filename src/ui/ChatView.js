@@ -11,6 +11,7 @@ import { Avatar, ChatAvatar, Badges } from './common.js';
 import { longPress } from './press.js';
 import { CallBar } from './Call.js';
 import { EMOJI_NAMES } from '../util/emoji.js';
+import * as stickers from '../stickers.js';
 
 const GROUP_GAP = 300;
 
@@ -26,6 +27,12 @@ function useFileUrl(fid, auto) {
     return () => { alive = false; };
   }, [fid, want]);
   return [url, err, () => setWant(true)];
+}
+
+function StickerAtt({ m }) {
+  const [url, err] = useFileUrl(m.file.id, true);    // stickers are small: always load them
+  return html`<div class="sticker">${url ? html`<img src=${url} alt="sticker" onClick=${() => ctx.sheet({ kind: 'image', url, name: m.file.name, fid: m.file.id })} />`
+    : html`<span class="muted">${err ? '⚠️' : I('🎴')}</span>`}</div>`;
 }
 
 function ImageAtt({ m }) {
@@ -102,6 +109,7 @@ function FileAtt({ m }) {
 function Attachment({ m }) {
   if (!m.file) return null;
   const e = extOf(m.file.name);
+  if (m.kind === 'image' && m.file.sticker) return html`<${StickerAtt} m=${m} />`;
   if (m.kind === 'image') return html`<${ImageAtt} m=${m} />`;
   if (m.kind === 'voice' || AUDIO_EXT.has(e)) return html`<${AudioAtt} m=${m} />`;
   if (VIDEO_EXT.has(e)) return html`<${VideoAtt} m=${m} />`;
@@ -153,7 +161,7 @@ function Message({ m, prev, chat, onMenu, highlight, isLast }) {
   }
   return html`<div class=${'msg' + (mine ? ' me' : '') + (grouped ? ' grouped' : '') + (highlight ? ' highlight' : '')} id=${'m' + m.id}>
     ${showAv ? html`<div class="avcol">${grouped ? null : html`<${Avatar} user=${u} size=${36} presence=${false} onClick=${() => ctx.profile(m.sender)} />`}</div>` : null}
-    <div class="bub" ...${longPress(() => onMenu(m))}>
+    <div class=${'bub' + (m.file && m.file.sticker && !m.deleted ? ' stk' : '')} ...${longPress(() => onMenu(m))}>
       ${!grouped && (rows || (!mine && chat.kind === 'group')) ? html`<div class="who"><span style=${{ color: (u && u.color) || 'var(--accent)' }}>${st.name(m.sender)}</span>
         <${Badges} list=${u && u.badges} max=${3} />${rows ? html`<span class="tiny muted">${fmtTime(m.created)}</span>` : null}</div>` : null}
       ${m.reply ? html`<div class="reply" onClick=${() => ctx.bus.emit('jump', m.reply.id)}><b>${st.name(m.reply.sender)}</b> <span class="muted">${m.reply.body}</span></div>` : null}
@@ -307,6 +315,14 @@ function Composer({ chat, reply, setReply, edit, setEdit, onSent }) {
     }
   }
 
+  async function sendSticker(e) {
+    const r = reply;
+    setReply(null);
+    ctx.play('sent', { vol: 0.25 });
+    onSent();
+    await ctx.try(stickers.send(chat.id, e, r ? r.id : null));
+  }
+
   function attach() {
     ctx.menu([
       { ic: '🖼️', label: 'Photos & videos', fn: async () => sendFiles(await pickFiles({ accept: 'image/*,video/*' })) },
@@ -351,6 +367,7 @@ function Composer({ chat, reply, setReply, edit, setEdit, onSent }) {
           <button class="iconbtn" onClick=${micCancel}>${I('🗑️')}</button><button class="iconbtn send" onClick=${micSend}>${I('➤')}</button>`
         : html`<button class="iconbtn" onClick=${attach}>${I('➕')}</button>
           <button class="iconbtn" onClick=${() => ctx.sheet({ kind: 'emoji', onPick: (e) => setText((t) => t + e) })}>${I('😀')}</button>
+          <button class="iconbtn" onClick=${() => ctx.sheet({ kind: 'sticker', onPick: sendSticker })}>${I('🎴')}</button>
           <textarea ref=${ta} rows="1" placeholder=${tr('Message...')} value=${text} onInput=${onInput}
             onKeyDown=${(e) => { if (e.key === 'Enter' && !e.shiftKey && S.get('enter_to_send')) { e.preventDefault(); send(); } if (e.key === 'Escape' && edit) { setEdit(null); setText(''); } }}></textarea>
           ${text.trim() ? html`<button class="iconbtn send" onClick=${send}>${I('➤')}</button>`
@@ -456,6 +473,7 @@ export function ChatView({ cid, jump }) {
       items.push({ ic: '⏰', label: 'Remind me', fn: () => remind(m) });
       if (m.file) {
         items.push({ ic: '⬇️', label: 'Save attachment', fn: async () => { const f = await getFile(m.file.id); saveFile(f.name, f.bytes); } });
+        if (m.kind === 'image') items.push({ ic: '🎴', label: 'Add to stickers', fn: () => ctx.try(stickers.addFromMessage(m).catch((e) => { ctx.toast(e.message || String(e), 'error'); })) });
         if (['gif', 'webp'].includes(extOf(m.file.name))) items.push({ ic: '⭐', label: 'Save to my GIFs', fn: async () => {
           const f = await getFile(m.file.id); const { saveMyGif } = await import('../gifs.js'); await saveMyGif(f.name, f.bytes); ctx.toast('⭐ Saved to My GIFs'); } });
       }

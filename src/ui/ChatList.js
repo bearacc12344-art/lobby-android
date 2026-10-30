@@ -15,7 +15,8 @@ export function preview(c) {
   if (!m) return tr('no messages yet');
   if (m.deleted) return tr('message deleted');
   let body = m.body, ic = null;
-  if (m.kind === 'image') { ic = '🖼️'; body = m.body || tr('🖼️ Photo').replace('🖼️ ', ''); }
+  if (m.kind === 'image' && m.file && m.file.sticker) { ic = '🎴'; body = tr('Sticker'); }
+  else if (m.kind === 'image') { ic = '🖼️'; body = m.body || tr('🖼️ Photo').replace('🖼️ ', ''); }
   else if (m.kind === 'voice') { ic = '🎤'; body = tr('🎤 Voice message').replace('🎤 ', ''); }
   else if (m.kind === 'file') { ic = '📎'; body = (m.file || {}).name || 'file'; }
   else if (m.kind === 'poll') { ic = '📊'; body = m.body || tr('Poll'); }

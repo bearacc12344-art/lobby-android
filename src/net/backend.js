@@ -238,6 +238,7 @@ export class Backend {
     if (m.file) {
       const f = jsonOr(m.file, {});
       d.file = { id: m.fid, name: f.name || 'file', size: f.size || 0 };
+      if (f.sticker && m.kind === 'image') d.file.sticker = true;
     }
     for (const r of this.q('SELECT user_id, emoji FROM reactions WHERE msg_id=? AND on_=1', m.id)) {
       (d.reactions[r.emoji] = d.reactions[r.emoji] || []).push(r.user_id);
@@ -264,7 +265,7 @@ export class Backend {
     if (this.q1('SELECT 1 FROM deletes WHERE msg_id=?', r.id)) return '(deleted)';
     const e = this.q1('SELECT body FROM edits WHERE msg_id=?', r.id);
     let body = e ? e.body : r.body;
-    if (!body && r.file) body = jsonOr(r.file, {}).name || 'file';
+    if (!body && r.file) { const f = jsonOr(r.file, {}); body = f.sticker ? '🎴 Sticker' : (f.name || 'file'); }
     return body || r.kind;
   }
   role(cid, uid) { const r = this.q1('SELECT role FROM members WHERE chat_id=? AND user_id=?', cid, uid); return r ? r.role : null; }
@@ -1337,7 +1338,17 @@ export class Backend {
     const at = parseFloat(d.send_at || 0);
     pl.mid = newMid(at ? Math.floor(at * 1000) : ms());
     pl.ms = ms();
-    if (d.file) {
+    if (d.file && d.file.reuse && typeof d.file.reuse === 'object') {
+      // a sticker that was sent before: send the same encrypted file again, nothing to upload
+      const r = d.file.reuse;
+      const meta = {};
+      for (const k of ['name', 'size', 'k', 'inline', 'url', 'parts', 'psize']) if (k in r) meta[k] = r[k];
+      if (!meta.k || !(meta.inline || String(meta.url || '').startsWith('https://') || meta.parts)) throw new Err("That sticker can't be re-sent, add it again");
+      meta.name = basename(String(meta.name || 'sticker')).slice(0, 120);
+      if (d.file.sticker) meta.sticker = 1;
+      pl.file = meta;
+      pl.kind = 'image';
+    } else if (d.file) {
       const raw = d.file.bytes || unb64(d.file.data);
       if (raw.length > MAX_FILE) throw new Err(`File too big (max ${MAX_FILE / 1024 / 1024} MB)`);
       const fkey = randBytes(32);
@@ -1357,6 +1368,7 @@ export class Backend {
           this.transfer('up', fname, raw.length, raw.length, t0, tid);
         }
       }
+      if (d.file.sticker && IMAGE_EXT.has(ext(fname))) meta.sticker = 1; // big, no bubble; older Smults just see a picture
       pl.file = meta;
       pl.kind = d.file.voice ? 'voice' : IMAGE_EXT.has(ext(fname)) ? 'image' : 'file';
     } else if (d.poll) {
@@ -1370,7 +1382,15 @@ export class Backend {
     if (['call', 'nudge', 'system'].includes(d.kind)) pl.kind = d.kind;
     this.applyChatOp(cid, this.me, { ...pl }, true);
     await this.sendChat(cid, pl);
-    return { id: pl.mid };
+    return { id: pl.mid, file: pl.file || null };
+  }
+  // the raw (encrypted-file) details of a picture message - lets 'Add to stickers' re-send it without uploading
+  async on_file_meta(d) {
+    const m = this.q1('SELECT kind, file FROM messages WHERE id=?', Number(d.msg_id));
+    if (!m || !m.file) throw new Err('No file on that message');
+    const f = jsonOr(m.file, {}), out = {};
+    for (const k of ['name', 'size', 'k', 'inline', 'url', 'parts', 'psize']) if (k in f) out[k] = f[k];
+    return out;
   }
   async on_history(d) {
     const cid = parseInt(d.chat_id, 10);
