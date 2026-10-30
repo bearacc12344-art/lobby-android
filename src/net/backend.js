@@ -1,5 +1,7 @@
 // Smult P2P backend - a faithful JavaScript port of p2p.py's Backend, so phones and PCs share the same chats,
 // friends, groups, calls and community brains. No server: Nostr relays carry signed, end-to-end encrypted events.
+import { hmac } from '@noble/hashes/hmac.js';
+import { sha1 } from '@noble/hashes/legacy.js';
 import { Keys, enc, dec, encBytes, decBytes, encPart, decPart, b64, unb64, hex, unhex, randBytes, sha256hex, te } from './crypto.js';
 import { RelayPool } from './relay.js';
 import { LocalDB } from './db.js';
@@ -11,6 +13,15 @@ export const DEFAULT_RELAYS = ['wss://relay.damus.io', 'wss://nos.lol', 'wss://r
   'wss://nostr.mom', 'wss://relay.nostr.net'];
 const BLOSSOM = globalThis.LOBBY_BLOSSOM || ['https://blossom.nostr.build', 'https://blossom.primal.net', 'https://nostr.download'];
 const STUN = ['stun:stun.l.google.com:19302', 'stun:stun.cloudflare.com:3478'];
+// built-in TURN (Open Relay's free public server, static-auth, same as PC): calls still connect on strict networks
+const OPEN_RELAY = 'staticauth.openrelay.metered.ca';
+function builtinTurn() {
+  const user = `${Math.floor(Date.now() / 1000) + 86400}:smult`;
+  const mac = hmac(sha1, new TextEncoder().encode('openrelayprojectsecret'), new TextEncoder().encode(user));
+  const credential = btoa(String.fromCharCode(...mac));
+  return { urls: [`turn:${OPEN_RELAY}:80`, `turn:${OPEN_RELAY}:80?transport=tcp`, `turn:${OPEN_RELAY}:443?transport=tcp`, `turns:${OPEN_RELAY}:443?transport=tcp`],
+    username: user, credential };
+}
 
 export const K_DIRECT = 4444, K_GROUP = 4445, K_EPH = 24444, K_GEPH = 24445, K_REPL = 30078, K_AUTH = 24242;
 export const K_BRAIN = 4446, K_LANG = 4447, K_STATUS = 4448;   // 4448: 24h status posts, encrypted to each friend
@@ -1990,15 +2001,31 @@ export class Backend {
   }
   async callSignal(c, payload, to = null) {
     const ch = this.q1('SELECT ckey, kind FROM chats WHERE id=?', c.chatId);
-    payload = { ...payload, cid: c.gcid, chat: ch.ckey.split(':')[0], started: c.started, starter: this.pub(c.starter) };
-    if (!to && ch.kind === 'group') await this.sendGeph(c.chatId, payload);
-    else await this.sendEph(to || this.callAudience(c), payload);
+    payload = { ...payload, cid: c.gcid, chat: ch.ckey.split(':')[0], started: c.started, starter: this.pub(c.starter), n: hex(randBytes(6)) };
+    if (ch.ckey.startsWith('g:')) payload.g = ch.ckey.slice(2);
+    if (!to && ch.kind === 'group') {
+      // straight to each member too: works even if someone missed the group's newest key (that made people invisible in calls)
+      await this.sendEph(this.callAudience(c), payload);
+      await this.sendGeph(c.chatId, payload);
+    } else await this.sendEph(to || this.callAudience(c), payload);
   }
   async applyCallSignal(author, pl, cid) {
     const t = pl.type, gcid = pl.cid;
     if (!gcid) return;
+    if (pl.n) {                                        // the same signal can come twice (direct + group)
+      this.callSeen = this.callSeen || new Map();
+      const key = author + ':' + String(pl.n).slice(0, 16);
+      if (this.callSeen.has(key)) return;
+      this.callSeen.set(key, now());
+      if (this.callSeen.size > 3000) for (const [k, v] of this.callSeen) if (v < now() - 120) this.callSeen.delete(k);
+    }
     if (cid === null || cid === undefined) {
-      cid = this.dmChat(author, this.isFriend(author));
+      if (pl.g) {                                      // a group call signal sent to me directly
+        const row = this.q1('SELECT id FROM chats WHERE ckey=? AND left=0', 'g:' + String(pl.g).slice(0, 64));
+        if (!row) return;
+        cid = row.id;
+      } else if (this.calls.has(gcid)) cid = this.calls.get(gcid).chatId;   // e.g. an offer from a group member who isn't my friend
+      else cid = this.dmChat(author, this.isFriend(author));
       if (!cid) return;
     }
     let starter = author;
@@ -2187,6 +2214,7 @@ export class Backend {
   rtcConfig() {
     const iceServers = [{ urls: STUN }];
     if (this.turn && this.turn.url) iceServers.push({ urls: [this.turn.url], username: this.turn.user || undefined, credential: this.turn.pass || undefined });
+    if (!(this.turn && this.turn.no_builtin)) iceServers.push(builtinTurn());
     return { iceServers };
   }
   // ---- keeping everyone connected (same rules as PC Smult v16)
@@ -2222,8 +2250,7 @@ export class Backend {
       }
       if (t - first > 30 && !this.warned.has(u) && !this.relayFor(c, u)) {
         this.warned.add(u);
-        this.emit({ t: 'call_declined', call_id: c.id, user_id: u,
-          reason: "can't connect to them directly (strict network/NAT). If nobody else in the call can pass their audio along, adding a TURN server in Settings → Advanced fixes it" });
+        this.emit({ t: 'call_link_failed', call_id: c.id, user_id: u });
       }
     }
     for (const u of [...this.dial.keys()]) if (!c.parts.has(u)) this.dial.delete(u);

@@ -255,6 +255,8 @@ export function onCallEvent(ctx, d) {
       ctx.bus.emit('callreact', d);
       if (!ctx.callFull && d.sound && d.from !== ctx.store.myId) ctx.toast(`${d.emoji} ${ctx.store.name(d.from)} played ${d.sound}`);
     }
+  } else if (t === 'call_link_failed') {
+    ctx.toast(`📵 Can't get a connection to ${ctx.store.name(d.user_id)} yet (a very strict network). Still trying…`, 'error');
   } else if (t === 'call_declined') {
     ctx.toast(`📵 ${ctx.store.name(d.user_id)} declined` + (d.reason ? `: ${d.reason}` : ''));
   }
