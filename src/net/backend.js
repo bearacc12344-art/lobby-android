@@ -98,7 +98,9 @@ export class Backend {
   x(sql, ...a) { return this.db.x(sql, ...a); }
   kv(k, d = null) { return this.db.kv(k, d); }
   setKv(k, v) { this.db.setKv(k, v); }
-  emit(obj) { if (!this.syncing || obj.t === 'init') this.net.emit(obj); }
+  // while catching up, old events aren't drawn one by one (the 'init' at the end redraws everything);
+  // what the user just did (sending a message, ...) always shows right away
+  emit(obj) { if (!this.syncing || this.userReq > 0 || obj.t === 'init') this.net.emit(obj); }
   uid(pub) {
     const r = this.q1('SELECT id FROM users WHERE pubkey=?', pub);
     if (r) return r.id;
@@ -348,13 +350,20 @@ export class Backend {
     this.resubscribe(true);
     const t0 = now();
     while (now() - t0 < 8 && this.eose.size < Math.max(1, this.pool.connected())) await sleep(100);
-    await this.drain();
-    const buf = this.syncBuf;
-    this.syncBuf = [];
-    buf.sort((a, b) => a.created_at - b.created_at);
-    for (const ev of buf) await this.process(ev);
-    await this.processStash();
-    this.syncing = false;
+    try {
+      await this.drain();
+      const buf = this.syncBuf;
+      this.syncBuf = [];
+      buf.sort((a, b) => a.created_at - b.created_at);
+      for (const ev of buf) { try { await this.process(ev); } catch (e) { console.warn('event error', e); } }
+      try { await this.processStash(); } catch (e) { console.warn('stash error', e); }
+    } finally {
+      // whatever happens, never stay stuck "catching up" (that hides every new message until a restart)
+      this.syncing = false;
+      const rest = this.syncBuf.sort((a, b) => a.created_at - b.created_at);
+      this.syncBuf = [];
+      for (const ev of rest) this.onEvent(ev);
+    }
     this.setKv('sync_ts', Math.floor(now()));
     const fresh = this.gids().filter((g) => !before.has(g));
     if (fresh.length) {
@@ -1081,7 +1090,8 @@ export class Backend {
   async handle(t, d) {
     const h = this['on_' + t];
     if (typeof h !== 'function') throw new Err('Not available in P2P mode');
-    return h.call(this, d || {});
+    this.userReq = (this.userReq || 0) + 1;
+    try { return await h.call(this, d || {}); } finally { this.userReq--; }
   }
   async on_update_profile(d) {
     const fields = {};
