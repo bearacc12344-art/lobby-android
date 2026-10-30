@@ -27,6 +27,7 @@ export const K_DIRECT = 4444, K_GROUP = 4445, K_EPH = 24444, K_GEPH = 24445, K_R
 export const K_BRAIN = 4446, K_LANG = 4447, K_STATUS = 4448;   // 4448: 24h status posts, encrypted to each friend
 export const K_JOIN = 4449, K_WSACT = 4458, K_ADDON = 34551, K_PUBGROUP = 34552, K_UPDATE = 34553;  // same as PC Smult
 const D_UPDATE_PHONE = 'smult-android';
+const D_TURN = 'smult-turn';        // a TURN server the owner shares with everyone
 const WS_INLINE = 40 * 1024, WS_MAX = 2 * 1024 * 1024;
 const STATUS_TTL = 24 * 3600;
 export const D_PROFILE = 'lobby-profile', D_STATE = 'lobby-state', D_BRAIN = 'lobby-brain-ckpt', D_LANG = 'lobby-lang-ckpt';
@@ -341,8 +342,18 @@ export class Backend {
         await this.loadMyProfile(evs);
       }
     } else if (mode === 'login') {
-      const evs = await this.pool.query([{ kinds: [K_REPL], authors: [this.k.pub], '#d': [D_PROFILE] }], 6000);
-      if (!evs.length) throw new Err('Wrong username or password');
+      // right after starting only one relay may be connected (and it may not have your account): ask again before
+      // calling it a wrong password
+      let evs = [];
+      const t0 = Date.now();
+      for (let attempt = 0; attempt < 5; attempt++) {
+        evs = await this.pool.query([{ kinds: [K_REPL], authors: [this.k.pub], '#d': [D_PROFILE] }], 6000);
+        if (evs.length) break;
+        const everyone = this.pool.connected() >= Math.max(1, this.pool.urls.length - 1);
+        if ((everyone && attempt >= 1) || Date.now() - t0 > 20000) break;
+        await sleep(1500);
+      }
+      if (!evs.length) throw new Err(this.pool.connected() ? 'Wrong username or password' : "Can't reach the Smult servers - check your internet and try again");
       await this.loadMyProfile(evs);
     }
     const u = this.q1('SELECT username FROM users WHERE id=?', this.me);
@@ -422,6 +433,7 @@ export class Backend {
     f.push({ kinds: [K_JOIN], '#p': [this.k.pub], since: Math.max(since, Math.floor(now()) - 14 * 86400) });   // public-group joins
     const root = this.bstate()[0];
     if (root) f.push({ kinds: [K_UPDATE], authors: [root], '#d': [D_UPDATE_PHONE] });                     // new phone versions
+    if (root) f.push({ kinds: [K_REPL], authors: [root], '#d': [D_TURN] });                               // owner's TURN
     const g = this.gids();
     if (g.length) {
       f.push({ kinds: [K_GROUP], '#g': g, since, limit: 5000 });
@@ -472,6 +484,7 @@ export class Backend {
       if (d === D_BRAIN) return this.applyBrainCkpt(ev, live);
       if (d === D_LANG) return this.applyLangCkpt(ev, live);
       if (d === badges.D_BADGES) return this.applyBadges(ev, live);
+      if (d === D_TURN) return this.applySharedTurn(ev);
       if (d === D_PROFILE) {
         this.bcache = null;
         const uid = this.applyProfile(ev);
@@ -2131,6 +2144,7 @@ export class Backend {
     this.checkCanSend(cid);
     for (const c of this.calls.values()) if (c.chatId === cid && c.parts.size) return this.on_call_join({ call_id: c.id });
     if (this.myCall) await this.leaveCall();
+    await this.refreshTurnApi();
     const c = this.getCall(hex(randBytes(8)), cid, now(), this.me);
     this.myCall = c.gcid;
     this.myState = { muted: false, deaf: false, cam: false, screen: false };
@@ -2148,6 +2162,7 @@ export class Backend {
     if (!c) throw new Err('That call already ended');
     if (this.myCall === c.gcid) return this.callView(c);
     if (this.myCall) await this.leaveCall();
+    await this.refreshTurnApi();
     this.myCall = c.gcid;
     this.myState = { muted: !!d.muted, deaf: false, cam: false, screen: false };
     if (this.rings.has(c.gcid)) { this.rings.delete(c.gcid); this.emit({ t: 'call_ring_stop', call_id: c.id }); }
@@ -2237,8 +2252,34 @@ export class Backend {
   rtcConfig() {
     const iceServers = [{ urls: STUN }];
     if (this.turn && this.turn.url) iceServers.push({ urls: [this.turn.url], username: this.turn.user || undefined, credential: this.turn.pass || undefined });
+    const sh = this.kv('shared_turn', null) || {};           // the owner's shared TURN (fixed, or from a credentials link)
+    if (sh.api && this.turnApi && this.turnApi.api === sh.api) iceServers.push(...this.turnApi.servers);
+    else if (sh.url) iceServers.push({ urls: [sh.url], username: sh.user || undefined, credential: sh.pass || undefined });
     if (!(this.turn && this.turn.no_builtin)) iceServers.push(builtinTurn());
     return { iceServers };
+  }
+  applySharedTurn(ev) {
+    if (ev.pubkey !== this.bstate()[0]) return;
+    let b; try { b = JSON.parse(ev.content); } catch (e) { return; }
+    const cur = this.kv('shared_turn', null) || {};
+    if ((cur.ts || 0) >= ev.created_at) return;
+    const clean = { ts: ev.created_at };
+    for (const k of ['url', 'user', 'pass', 'api']) { const v = String(b[k] || '').slice(0, 500); if (v) clean[k] = v; }
+    if (clean.url && !/^turns?:/.test(clean.url)) delete clean.url;
+    if (clean.api && !clean.api.startsWith('https://')) delete clean.api;
+    this.setKv('shared_turn', clean);
+    this.turnApi = null;
+  }
+  async refreshTurnApi() {
+    const sh = this.kv('shared_turn', null) || {};
+    if (!sh.api || (this.turnApi && this.turnApi.api === sh.api && Date.now() - this.turnApi.at < 1800000)) return;
+    try {
+      const ctl = new AbortController(); const tm = setTimeout(() => ctl.abort(), 6000);
+      const r = await fetch(sh.api, { signal: ctl.signal }); clearTimeout(tm);
+      const data = await r.json();
+      const list = (Array.isArray(data) ? data : data.iceServers || []).filter((x) => [].concat(x.urls || x.url || []).some((u) => String(u).startsWith('turn')));
+      if (list.length) this.turnApi = { api: sh.api, at: Date.now(), servers: list.map((x) => ({ urls: x.urls || x.url, username: x.username, credential: x.credential })) };
+    } catch (e) { console.warn('turn credentials link', e); }
   }
   // ---- keeping everyone connected (same rules as PC Smult v16)
   presenceSt() { return { ...this.myState, links: this.myLinks() }; }
