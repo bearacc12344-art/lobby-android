@@ -47,26 +47,67 @@ export function applyTheme() {
 }
 
 
-// ---------------------------------------------------------------- picture / GIF backgrounds (Settings → Themes)
-let bgUrl = '', bgKey = '';
+// ---------------------------------------------------------------- backgrounds (Settings → Themes):
+// picture / GIF, interactive (livebg.js), or a YouTube video (embedded, muted, looping)
+let bgUrl = '', bgKey = '', live = null, liveKey = '', ytKey = '';
+export function liveConfig() {
+  const name = S.get('bg_live') || 'Neon Web';
+  const mine = S.get('live_bgs') || {};
+  return { name, cfg: mine[name] || null };
+}
 export async function applyBackground() {
-  const on = S.get('bg_mode') === 'image' && S.get('bg_key');
+  const mode = S.get('bg_mode');
+  const on = (mode === 'image' && S.get('bg_key')) || mode === 'live' || (mode === 'video' && S.get('bg_yt'));
   let layer = document.getElementById('bgLayer');
   if (!layer) {
     layer = document.createElement('div');
     layer.id = 'bgLayer';
-    layer.innerHTML = '<i class="pic"></i><i class="tint"></i>';
+    layer.innerHTML = '<i class="pic"></i><canvas class="live"></canvas><div class="yt"></div><i class="tint"></i>';
     document.body.prepend(layer);
   }
   document.documentElement.classList.toggle('has-bg', !!on);
   const root = document.documentElement.style;
   root.setProperty('--glass-a', String(Math.max(0.2, Math.min(1, (S.get('glass_opacity') ?? 78) / 100))));
+  const pic = layer.querySelector('.pic'), tint = layer.querySelector('.tint'), canvas = layer.querySelector('.live'), yt = layer.querySelector('.yt');
+  // interactive
+  const lk = mode === 'live' ? JSON.stringify(liveConfig()) : '';
+  if (lk !== liveKey) {
+    liveKey = lk;
+    if (live) { live.stop(); live = null; }
+    if (mode === 'live') {
+      const L = await import('./livebg.js');
+      const { name, cfg } = liveConfig();
+      live = L.runCanvas(canvas, L.clean(cfg || L.PRESETS[name] || L.DEFAULT), () => { const p = palette(); return { accent: p.accent, accent2: p.accent2 || p.accent }; },
+        { input: window });
+    }
+  }
+  canvas.style.display = mode === 'live' ? '' : 'none';
+  // YouTube
+  const yk = mode === 'video' ? S.get('bg_yt') || '' : '';
+  if (yk !== ytKey) {
+    ytKey = yk;
+    yt.innerHTML = '';
+    if (yk) {
+      const f = document.createElement('iframe');
+      f.src = `https://www.youtube-nocookie.com/embed/${yk}?autoplay=1&mute=1&loop=1&playlist=${yk}&controls=0&playsinline=1&modestbranding=1&rel=0&disablekb=1&iv_load_policy=3`;
+      f.allow = 'autoplay; encrypted-media';
+      f.setAttribute('frameborder', '0');
+      f.setAttribute('tabindex', '-1');
+      yt.appendChild(f);
+    }
+  }
+  yt.style.display = mode === 'video' ? '' : 'none';
   if (!on) { layer.style.display = 'none'; return; }
   layer.style.display = '';
-  const pic = layer.querySelector('.pic'), tint = layer.querySelector('.tint');
-  pic.style.opacity = String((S.get('bg_opacity') ?? 60) / 100);
-  pic.style.filter = S.get('bg_blur') ? `blur(${S.get('bg_blur')}px)` : '';
+  const isPic = mode === 'image', soft = mode !== 'live';
+  pic.style.display = isPic ? '' : 'none';
+  const op = String((S.get('bg_opacity') ?? 60) / 100);
+  pic.style.opacity = op; yt.style.opacity = op;
+  const blur = S.get('bg_blur') ? `blur(${S.get('bg_blur')}px)` : '';
+  pic.style.filter = blur; yt.style.filter = blur;
+  tint.style.display = soft ? '' : 'none';
   tint.style.opacity = String((S.get('bg_tint') ?? 25) / 100);
+  if (!isPic) return;
   const key = S.get('bg_key');
   if (key !== bgKey) {
     bgKey = key;

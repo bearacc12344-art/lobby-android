@@ -323,6 +323,10 @@ html:not(.noanim) .applogo { animation: logoFloat 3.2s ease-in-out infinite; }
 #bgLayer { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
 #bgLayer .pic { position: absolute; inset: -20px; background-size: cover; background-position: center; }
 #bgLayer .tint { position: absolute; inset: 0; background: var(--bg); }
+#bgLayer .live { position: absolute; inset: 0; width: 100%; height: 100%; }
+#bgLayer .yt { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+#bgLayer .yt iframe { position: absolute; left: 50%; top: 50%; width: max(100vw, 177.78vh); height: max(100vh, 56.25vw);
+  transform: translate(-50%, -50%) scale(1.15); border: 0; pointer-events: none; }
 .has-bg body, .has-bg .screen, .has-bg .content { background: transparent !important; }
 .has-bg #app { position: relative; z-index: 1; }
 .has-bg .topbar, .has-bg .composer, .has-bg .bottomnav { background: color-mix(in srgb, var(--panel) calc(var(--glass-a) * 100%), transparent) !important;
