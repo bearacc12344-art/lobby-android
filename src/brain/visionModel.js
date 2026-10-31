@@ -6,13 +6,13 @@ import { NumpyRNG } from './nprng.js';
 import { sha256 } from '@noble/hashes/sha2.js';
 
 export const SIDE = 32;
-export const CH = [3, 16, 24, 32, 48];
+export const CH = [3, 24, 40, 64, 96];          // Brain 4: wider, room for up to 100 things
 export const POOLED = [true, true, true, false];
 export const FEAT = 2 * CH[4];
-export const HID = 64;
+export const HID = 128;
 export const NOTHING = 'nothing';
-export const MAX_LABELS = 17;
-export const VERSION = 3;
+export const MAX_LABELS = 101;
+export const VERSION = 4;
 const KEEP = 0.75;
 
 export function labelSeed(label) {

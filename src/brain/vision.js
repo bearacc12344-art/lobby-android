@@ -64,7 +64,7 @@ export class VisionBrain {
   }
   async publish() {
     const content = await this.call('checkpoint', { name: this.myName() }).catch(() => null);
-    if (content) this.ctx.try(this.ctx.api('brain_publish', { content }, { quiet: true }));
+    if (content) this.ctx.try(this.ctx.api('brain_publish', { content, parts: true }, { quiet: true }));
   }
   async addExample(ex) {
     if (!this.loaded) return;

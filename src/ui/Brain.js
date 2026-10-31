@@ -160,7 +160,7 @@ function VisionPage() {
     const known = Object.keys(st.counts || {}).sort();
     const lab = ((await ctx.prompt(`${files.length} pictures — what are they?` + (known.length ? `\n(${tr('it knows')}: ${known.join(', ')})` : ''), { value: label, placeholder: 'e.g. my dawg' })) || '').trim().toLowerCase().slice(0, 16);
     if (!lab) return;
-    if (!b.canLearn(lab)) return ctx.toast('It already knows 16 things (max). Pick one of those!', 'error');
+    if (!b.canLearn(lab)) return ctx.toast('It already knows 100 things (max). Pick one of those!', 'error');
     setFeeding(true); setLabel(lab);
     const j = { label: lab, total: files.length, processed: 0, imported: 0, dupes: 0, failed: 0, failures: [], paused: false, cancelled: false, done: false, t0: Date.now() };
     ctx.brainJob = j;
@@ -193,7 +193,7 @@ function VisionPage() {
     const lab = label.trim().toLowerCase();
     if (!x) return ctx.toast('Draw or upload something first ✏️');
     if (!lab) return ctx.toast('Give it a name');
-    if (!b.canLearn(lab)) return ctx.toast('It already knows 16 things (max). Pick one of those!', 'error');
+    if (!b.canLearn(lab)) return ctx.toast('It already knows 100 things (max). Pick one of those!', 'error');
     await ctx.try(b.feed(lab, x));
     pad.current.clear();
   };
@@ -383,19 +383,86 @@ function LangJobCard({ j }) {
 }
 
 // ===================================================================== hub
+// talk to the Brain: it answers with the language half and looks at pictures with the picture half
+function TalkPage() {
+  const [msgs, setMsgs] = useState(() => ctx.brainTalk || [{ me: false, text: tr("Hi! I'm the Smult Brain. Talk to me and I'll answer with what everyone's text taught me (I'm still learning, so I might babble). Show me a picture and I'll say what I think it is.") }]);
+  const [text, setText] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [temp, setTemp] = useState(70);
+  const list = useRef(null);
+  const push = (m) => setMsgs((ms) => { const n = [...ms, m]; ctx.brainTalk = n; return n; });
+  useEffect(() => { if (list.current) list.current.scrollTop = list.current.scrollHeight; }, [msgs.length]);
+  const convo = () => msgs.filter((m) => !m.pic).slice(-6).map((m) => m.text).join('\n');
+  const send = async () => {
+    const t = text.trim();
+    if (!t || busy) return;
+    setText('');
+    push({ me: true, text: t });
+    const lg = ctx.lang;
+    if (!lg) return;
+    await lg.ensureLoaded();
+    setBusy(true);
+    let out = '';
+    try { out = await lg.write((convo() + '\n' + t + '\n').slice(-200), 160, temp / 100, '\n\n'); } catch (e) { out = ''; }
+    setBusy(false);
+    out = (out || '').trim().split('\n\n')[0].trim();
+    push({ me: false, text: out || tr("…I haven't learned to read yet - everyone's PCs train me on the text people feed me. Come back soon! 📚") });
+  };
+  const picture = async () => {
+    const [f] = await pickFiles({ accept: 'image/*', multiple: false });
+    if (!f || !ctx.brain) return;
+    const b = ctx.brain;
+    await b.ensureLoaded();
+    const bmp = await fileToBitmap(f, 256);
+    const x = photoInput(bmp, bmp.width, bmp.height);
+    push({ me: true, text: tr("What's this?"), pic: URL.createObjectURL(f) });
+    const res = await b.think(x);
+    const real = (b.st && b.st.userLabels) || [];
+    let a;
+    if (!real.length) a = tr("I don't know any things yet - teach me some pictures in the Pictures tab! 🍎");
+    else if (!res.preds.length) a = '…';
+    else {
+      const [lab, pr] = res.preds[0];
+      if (lab === NOTHING) a = tr("🤷 That doesn't look like anything I know.");
+      else if (res.fam !== null && res.fam < 0.35) a = tr(`🤔 I've never seen anything like this. The closest thing I know is '${res.closest}'.`);
+      else {
+        a = `${tr(pr > 0.8 ? "I'm pretty sure" : pr > 0.5 ? 'I think' : 'My guess is')} ${tr("that's a")} ${lab} (${Math.round(pr * 100)}%)`;
+        const others = res.preds.slice(1, 4).filter(([l, p]) => l !== NOTHING && p > 0.05);
+        if (others.length) a += '\n' + tr('could also be') + ': ' + others.map(([l, p]) => `${l} ${Math.round(p * 100)}%`).join(', ');
+      }
+    }
+    push({ me: false, text: a });
+  };
+  return html`<div style=${{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+    <div ref=${list} style=${{ flex: 1, overflowY: 'auto', padding: '6px 2px' }}>
+      ${msgs.map((m) => html`<div style=${{ display: 'flex', justifyContent: m.me ? 'flex-end' : 'flex-start', margin: '6px 0' }}>
+        <div class="card" style=${{ maxWidth: '82%', padding: '8px 12px', whiteSpace: 'pre-wrap', background: m.me ? 'var(--bubble-me, var(--accent))' : undefined, color: m.me ? 'var(--accent-text, #000)' : undefined }} data-raw=${1}>
+          ${m.pic ? html`<img src=${m.pic} style=${{ maxWidth: '160px', borderRadius: '10px', display: 'block', marginBottom: '6px' }} />` : null}${m.text}</div></div>`)}
+      ${busy ? html`<div class="muted small" style=${{ margin: '6px 4px' }}>💭 ${tr('thinking…')}</div>` : null}
+    </div>
+    <div class="row" style=${{ gap: '6px', alignItems: 'center', marginTop: '6px' }}>
+      <button class="iconbtn" onClick=${picture}>${I('📷')}</button>
+      <input class="field grow" placeholder=${tr('Say something to the Brain…')} value=${text} onInput=${(e) => setText(e.target.value)} onKeyDown=${(e) => e.key === 'Enter' && send()} data-raw=${1} />
+      <button class="iconbtn send" onClick=${send}>${I('➤')}</button>
+    </div>
+    <div class="row small muted" style=${{ gap: '6px', alignItems: 'center' }}>🎲 ${tr('Creativity')}
+      <input type="range" min="20" max="150" value=${temp} onInput=${(e) => setTemp(+e.target.value)} style=${{ flex: 1 }} /></div>
+  </div>`;
+}
+
 export function BrainHub() {
   useBus(['brain', 'lang']);
   const [tab, setTab] = useState(ctx.brainTab || 0);
   useEffect(() => {
-    const m = tab === 0 ? ctx.brain : ctx.lang;
-    if (m) m.ensureLoaded();
+    for (const m of tab === 2 ? [ctx.brain, ctx.lang] : [tab === 0 ? ctx.brain : ctx.lang]) if (m) m.ensureLoaded();
     ctx.brainTab = tab;
   }, [tab, !!ctx.brain, !!ctx.lang]);
   return html`<div class="topbar"><h1>${I('🧠')} ${tr('The Smult Brain')}</h1></div>
     <div class="chips" style=${{ paddingTop: 0 }}>
       <button class=${'chip' + (tab === 0 ? ' on' : '')} onClick=${() => setTab(0)}>${I('🖼')} ${tr('Pictures')}</button>
       <button class=${'chip' + (tab === 1 ? ' on' : '')} onClick=${() => setTab(1)}>${I('📚')} ${tr('Language')}</button>
+      <button class=${'chip' + (tab === 2 ? ' on' : '')} onClick=${() => setTab(2)}>${I('💬')} ${tr('Talk')}</button>
     </div>
-    <div class="content">${tab === 0 ? html`<${VisionPage} />` : html`<${LangPage} />`}</div>`;
+    <div class="content">${tab === 0 ? html`<${VisionPage} />` : tab === 1 ? html`<${LangPage} />` : html`<${TalkPage} />`}</div>`;
 }
 void SIDE;

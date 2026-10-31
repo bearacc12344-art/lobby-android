@@ -1,4 +1,5 @@
-// Background trainer for the community language brain (port of lang.LangBrain's data + training thread)
+// The community language brain on a phone (Brain 4): keeps the text library, downloads + averages the tiny GPT that
+// everyone's PCs train, scores it and writes with it. (Training a transformer is PC work - phones only feed text.)
 import { LangNet, normalize, encode, CTX, VERSION, VOCAB } from './langModel.js';
 
 const SEP = encode('\n\n');
@@ -46,14 +47,14 @@ function rebuild() {
   train = tr.length ? cat(tr) : null;
   const val = va.length ? cat(va) : null;
   if (val && val.length > CTX + 10) {
-    nv = 1024;
-    Xv = new Uint8Array(nv * CTX); yv = new Uint8Array(nv);
+    nv = 6;                                         // a few passages: enough for a score, cheap on a phone
+    Xv = new Uint8Array(nv * CTX); yv = new Uint8Array(nv * CTX);
     let seed = 7;
     const rnd = () => { seed = (Math.imul(seed, 1103515245) + 12345) >>> 0; return seed / 4294967296; };
     for (let b = 0; b < nv; b++) {
-      const i = CTX + Math.floor(rnd() * (val.length - CTX));
-      Xv.set(val.subarray(i - CTX, i), b * CTX);
-      yv[b] = val[i];
+      const i = Math.floor(rnd() * (val.length - CTX - 1));
+      Xv.set(val.subarray(i, i + CTX), b * CTX);
+      yv.set(val.subarray(i + 1, i + CTX + 1), b * CTX);
     }
   } else { Xv = yv = null; nv = 0; }
   lastRebuild = Date.now();
@@ -61,7 +62,10 @@ function rebuild() {
 const chars = () => { let s = 0; for (const c of chunks.values()) s += c.ids.length; return s; };
 const totalSteps = () => Object.values(contrib).reduce((s, c) => s + c.steps, 0);
 
-function burst() {
+function burst() {                                 // (phones don't train the tiny GPT)
+  return false;
+}
+function oldBurst() {
   if (dirty && (!train || Date.now() - lastRebuild > 5000)) rebuild();
   const ready = train && train.length > CTX * 20;
   if (ready) {
@@ -88,10 +92,8 @@ function loop() {
   timer = setTimeout(loop, ready ? 600 : 2000);
 }
 function measure() {
-  if (!Xv) { bpc = null; return; }
-  let s = 0;
-  for (let o = 0; o < nv; o += 256) s += net.loss(Xv.subarray(o * CTX, (o + 256) * CTX), yv.subarray(o, o + 256), Math.min(256, nv - o)) * Math.min(256, nv - o);
-  bpc = s / nv / Math.log(2);
+  if (!Xv || net.empty) { bpc = null; return; }
+  bpc = net.loss(Xv, yv, nv) / Math.log(2);
 }
 function addPoint(n) {
   if (bpc === null) return;
@@ -150,7 +152,7 @@ self.onmessage = (e) => {
   const { id, op, d } = e.data;
   let res = null;
   try {
-    if (op === 'init') net = new LangNet(new Float32Array(d.genesis));
+    if (op === 'init') net = new LangNet();
     else if (op === 'load') {
       myPub = d.data.me; myName = d.name || myName;
       for (const c of d.data.chunks) add(c);
@@ -171,8 +173,9 @@ self.onmessage = (e) => {
         if (d.train || d.first) measure();
         if (d.point) addPoint();
       }
-    } else if (op === 'checkpoint') { if (d && d.name) myName = d.name; res = loaded && mySteps > 0 ? checkpoint() : null; }
-    else if (op === 'write') res = net.generate(d.prompt || '', d.n || 300, d.temp || 0.7);
+    } else if (op === 'checkpoint') { res = null; }    // phones never publish the language brain
+    else if (op === 'write') res = net.empty ? '' : net.generate(d.prompt || '', Math.min(d.n || 200, 220), d.temp || 0.7, d.stop || null);
+    else if (op === 'next' && net.empty) res = [];
     else if (op === 'next') {
       const p = net.nextProbs(d.text);
       const top = [...p.keys()].sort((a, b) => p[b] - p[a]).slice(0, 6);

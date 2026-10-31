@@ -27,7 +27,9 @@ export const K_DIRECT = 4444, K_GROUP = 4445, K_EPH = 24444, K_GEPH = 24445, K_R
 export const K_BRAIN = 4446, K_LANG = 4447, K_STATUS = 4448;   // 4448: 24h status posts, encrypted to each friend
 export const K_JOIN = 4449, K_WSACT = 4458, K_ADDON = 34551, K_PUBGROUP = 34552, K_UPDATE = 34553;  // same as PC Smult
 const D_UPDATE_PHONE = 'smult-android';
-const D_TURN = 'smult-turn';        // a TURN server the owner shares with everyone
+const D_TURN = 'smult-turn';
+// Brain 4 checkpoints are too big for one relay message: sent in parts (d = '<base>:<i>') and put back together here
+const D_BRAIN4 = 'smult-brain4', D_LANG4 = 'smult-lang4', CKPT_PART = 45000, CKPT_MAX_PARTS = 8;        // a TURN server the owner shares with everyone
 const WS_INLINE = 40 * 1024, WS_MAX = 2 * 1024 * 1024;
 const STATUS_TTL = 24 * 3600;
 export const D_PROFILE = 'lobby-profile', D_STATE = 'lobby-state', D_BRAIN = 'lobby-brain-ckpt', D_LANG = 'lobby-lang-ckpt';
@@ -428,6 +430,7 @@ export class Backend {
     f.push({ kinds: [K_REPL], '#d': [D_BRAIN], limit: 60 });
     f.push({ kinds: [K_LANG], '#t': ['lobby-lang'], limit: 4000 });
     f.push({ kinds: [K_REPL], '#d': [D_LANG], limit: 60 });
+    f.push({ kinds: [K_REPL], '#d': [D_BRAIN4, D_LANG4].flatMap((b) => Array.from({ length: CKPT_MAX_PARTS }, (_, i) => `${b}:${i}`)), limit: 400 });
     f.push({ kinds: [K_STATUS], '#p': [this.k.pub], since: Math.floor(now()) - STATUS_TTL });
     f.push({ kinds: [K_STATUS], authors: [this.k.pub], since: Math.floor(now()) - STATUS_TTL });
     f.push({ kinds: [K_JOIN], '#p': [this.k.pub], since: Math.max(since, Math.floor(now()) - 14 * 86400) });   // public-group joins
@@ -481,6 +484,8 @@ export class Backend {
     if (k === K_LANG) return this.applyLangTxt(ev, live);
     if (k === K_REPL) {
       const d = tag(ev, 'd');
+      const base = d ? d.replace(/:\d+$/, '') : '';
+      if (base === D_BRAIN4 || base === D_LANG4) return this.applyCkptPart(ev, base, live);
       if (d === D_BRAIN) return this.applyBrainCkpt(ev, live);
       if (d === D_LANG) return this.applyLangCkpt(ev, live);
       if (d === badges.D_BADGES) return this.applyBadges(ev, live);
@@ -552,6 +557,38 @@ export class Backend {
     await idb.put('brain_ex', ev.id, ex);
     if (live) this.emit({ t: 'brain_ex', ex });
   }
+  async applyCkptPart(ev, base, live) {
+    const i = parseInt(tag(ev, 'd').split(':').pop(), 10), n = parseInt(tag(ev, 'n') || '0', 10), sid = String(tag(ev, 'set') || '').slice(0, 16);
+    if (!(i >= 0 && i < n && n <= CKPT_MAX_PARTS) || !sid || ev.content.length > CKPT_PART + 100) return;
+    const store = base === D_BRAIN4 ? 'brain_ckpt' : 'lang_ckpt';
+    const key = (j) => `part:${base}:${ev.pubkey}:${j}`;
+    const cur = await idb.get('kv', key(i));
+    if (cur && cur.created > ev.created_at) return;
+    await idb.put('kv', key(i), { sid, n, created: ev.created_at, data: ev.content });
+    const parts = [];
+    for (let j = 0; j < n; j++) {
+      const p = await idb.get('kv', key(j));
+      if (!p || p.sid !== sid) return;                // still waiting for the other parts
+      parts.push(p);
+    }
+    const created = Math.max(...parts.map((p) => p.created));
+    const have = await idb.get(store, ev.pubkey);
+    if (have && have.created >= created) return;
+    const content = parts.map((p) => p.data).join('');
+    await idb.put(store, ev.pubkey, { author: ev.pubkey, created, content });
+    if (live && ev.pubkey !== this.k.pub) this.emit({ t: store, author: ev.pubkey, created, content });
+  }
+  async publishCkpt(base, ttag, store, content) {
+    if (content.length > CKPT_PART * CKPT_MAX_PARTS) throw new Err('checkpoint too big');
+    const parts = [];
+    for (let i = 0; i < content.length; i += CKPT_PART) parts.push(content.slice(i, i + CKPT_PART));
+    const sid = hex(randBytes(4)), created = Math.floor(now());
+    for (let i = 0; i < parts.length; i++) {
+      const ev = this.k.sign(K_REPL, [['d', `${base}:${i}`], ['t', ttag], ['set', sid], ['n', String(parts.length)]], parts[i], created);
+      this.pool.publish(ev);
+    }
+    await idb.put(store, this.k.pub, { author: this.k.pub, created, content });
+  }
   async applyBrainCkpt(ev, live) {
     const cur = await idb.get('brain_ckpt', ev.pubkey);
     if ((cur && cur.created >= ev.created_at) || ev.content.length > 200000) return;
@@ -576,6 +613,7 @@ export class Backend {
   }
   async on_brain_publish(d) {
     const content = String(d.content || '');
+    if (d.parts) { await this.publishCkpt(D_BRAIN4, 'lobby-brain', 'brain_ckpt', content); return true; }
     if (content.length > 120000) throw new Err('checkpoint too big');
     const ev = this.k.sign(K_REPL, [['d', D_BRAIN], ['t', 'lobby-brain']], content);
     await idb.put('brain_ckpt', this.k.pub, { author: this.k.pub, created: ev.created_at, content });

@@ -9,7 +9,7 @@ export class LangBrain {
     this.ctx = ctx;
     this.worker = new Worker(new URL('./langWorker.js', import.meta.url), { type: 'module' });
     this.call = rpc(this.worker);
-    this.ready = fetch('./assets/brain/lang_genesis.f32').then((r) => r.arrayBuffer()).then((g) => this.call('init', { genesis: g }, [g]));
+    this.ready = this.call('init', {});              // (Brain 4: the language brain comes from everyone's PCs)
     this.asked = false; this.loading = false; this.loaded = false;
     this.st = { loaded: false, bpc: null, chars: 0, docs: 0, totalSteps: 0, mySteps: 0, unpublished: 0, contrib: {}, history: [], library: [], online: 0 };
     this.job = null;
@@ -64,7 +64,7 @@ export class LangBrain {
     await this.call('merge', { author, content, created });
     this.refresh();
   }
-  write(prompt, n, temp) { return this.call('write', { prompt, n, temp }); }
+  write(prompt, n, temp, stop = null) { return this.call('write', { prompt, n, temp, stop }); }
   nextLetters(text) { return this.call('next', { text }); }
 
   async teachText(text) {
