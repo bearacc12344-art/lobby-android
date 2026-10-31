@@ -97,7 +97,17 @@ export class Backend {
     this.pool = new RelayPool(relays, {
       onEvent: (ev) => this.onEvent(ev),
       onEose: (url, sid) => { if (sid === 'main') this.eose.add(url); },
-      onStatus: () => this.net.state(this.pool.connected() ? 'online' : 'reconnecting'),
+      onStatus: () => {
+        const n = this.pool.connected();
+        this.net.state(n ? 'online' : 'reconnecting');
+        // back online after a drop: fetch everything from the gap, page by page
+        if (!n && !this.offlineSince) this.offlineSince = now();
+        else if (n && this.offlineSince) {
+          const gap = this.offlineSince;
+          this.offlineSince = null;
+          if (!this.syncing && now() - gap > 20) fire(this.backfillGap(Math.floor(gap) - 120));
+        }
+      },
     });
   }
 
@@ -367,6 +377,34 @@ export class Backend {
     this.applyProfile(mine);
     await this.publishProfile();
   }
+  // handled already this session? (re-handling is harmless - messages are de-duplicated - just wasted work)
+  isDone(id) { return !!(this.doneIds && this.doneIds.has(id)); }
+  backfillFilters() {
+    const f = [{ kinds: [K_DIRECT], '#p': [this.k.pub] }, { kinds: [K_DIRECT], authors: [this.k.pub] }];
+    const g = this.gids();
+    if (g.length) f.push({ kinds: [K_GROUP], '#g': g });
+    return f;
+  }
+  // everything sent to me / my groups while I was away (the live subscription only gets each relay's newest few hundred)
+  async backfill() {
+    const since = Math.max(0, (this.kv('sync_ts', 0) || 0) - 3600);
+    if (!since) return;
+    const seen = new Set(this.syncBuf.map((e) => e.id));
+    for (const f of this.backfillFilters()) {
+      for (const ev of await this.pool.queryAll(f, since)) {
+        if (seen.has(ev.id) || this.isDone(ev.id)) continue;
+        seen.add(ev.id);
+        this.syncBuf.push(ev);
+      }
+    }
+  }
+  async backfillGap(since) {
+    await sleep(3000);
+    let evs = [];
+    for (const f of this.backfillFilters()) { try { evs = evs.concat(await this.pool.queryAll(f, since)); } catch (e) { console.warn('gap backfill', e); } }
+    evs = evs.filter((e) => !this.isDone(e.id)).sort((a, b) => a.created_at - b.created_at);
+    for (const ev of evs) this.onEvent(ev);
+  }
   async afterStart() {
     this.syncing = true;
     this.emit(this.initPayload());
@@ -374,6 +412,7 @@ export class Backend {
     this.resubscribe(true);
     const t0 = now();
     while (now() - t0 < 8 && this.eose.size < Math.max(1, this.pool.connected())) await sleep(100);
+    try { await this.backfill(); } catch (e) { console.warn('backfill', e); }
     try {
       await this.drain();
       const buf = this.syncBuf;
@@ -473,6 +512,9 @@ export class Backend {
   }
   async process(ev, live = null) {
     live = live === null ? !this.syncing : live;
+    this.doneIds = this.doneIds || new Set();
+    this.doneIds.add(ev.id);
+    if (this.doneIds.size > 50000) this.doneIds = new Set([...this.doneIds].slice(-25000));
     const k = ev.kind;
     if (k === K_JOIN) return this.applyJoinRequest(ev);
     if (k === K_UPDATE) {

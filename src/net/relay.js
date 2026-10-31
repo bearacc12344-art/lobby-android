@@ -85,6 +85,10 @@ export class RelayPool {
       const sid = msg[1], ev = msg[2];
       if (!ev || typeof ev !== 'object' || !ev.id) return;
       const w = this.waiters.get(sid);
+      if (w && w.stats) {                 // paging: how many each relay sent, and its oldest one
+        const [c, m] = w.stats.get(url) || [0, Infinity];
+        w.stats.set(url, [c + 1, Math.min(m, ev.created_at | 0)]);
+      }
       if (this.seen.has(ev.id)) {
         if (!w) return;
         if (this.seen.get(ev.id) === 1) { w.events.set(ev.id, ev); return; }
@@ -175,11 +179,11 @@ export class RelayPool {
     }
     for (const k of old) if (!used.has(k)) { this.subs.delete(k); this._sendAll(JSON.stringify(['CLOSE', k])); }
   }
-  query(filters, timeout = 5000) {
+  query(filters, timeout = 5000, stats = null) {
     const sid = 'q' + Math.random().toString(16).slice(2, 10);
     const need = Math.max(1, this.ws.size);
     return new Promise((resolve) => {
-      const w = { events: new Map(), eose: 0, need, resolve: null };
+      const w = { events: new Map(), eose: 0, need, resolve: null, stats };
       const done = () => {
         clearTimeout(t);
         if (!this.waiters.has(sid)) return;
@@ -192,6 +196,25 @@ export class RelayPool {
       this.waiters.set(sid, w);
       this._sendAll(JSON.stringify(['REQ', sid, ...filters]));
     });
+  }
+  // everything matching flt since `since`, page by page: relays only send their newest few hundred per request, so keep
+  // asking for the next older page until every relay runs out (pages follow the relay with the narrowest window)
+  async queryAll(flt, since, timeout = 8000, maxPages = 80) {
+    const out = new Map();
+    let until = null;
+    for (let p = 0; p < maxPages; p++) {
+      const f = { ...flt, since, limit: 1000 };
+      if (until !== null) f.until = until;
+      const stats = new Map();
+      for (const e of await this.query([f], timeout, stats)) out.set(e.id, e);
+      const full = [...stats.values()].filter(([c]) => c >= 40).map(([, m]) => m);
+      if (!full.length) break;
+      let nxt = Math.max(...full);
+      if (until !== null && nxt >= until) nxt = until - 1;
+      if (nxt < since) break;
+      until = nxt;
+    }
+    return [...out.values()];
   }
   async waitConnected(timeout = 10000) {
     const t0 = Date.now();
