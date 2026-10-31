@@ -77,11 +77,17 @@ export class CallAudio {
     const cfg = { gain: S.get('mic_gain') / 100, gateDb: S.get('gate_db'), highpass: S.get('highpass'), muted: this.muted || this.deaf,
       sendRate: S.get('voice_quality'), inCall: true };
     if (this.mic) this.mic.port.postMessage({ cfg });
-    if (this.out) this.out.port.postMessage({ cfg: { deaf: this.deaf, vol: S.get('user_volumes') || {}, out: S.get('out_volume') / 100, muted: this.localMuted || [] } });
+    if (this.out) {
+      if (this.ownerLock) {                          // the Smult owner is in the call: nothing turned down, nobody muted
+        const vol = Object.fromEntries(Object.entries(S.get('user_volumes') || {}).map(([k, v]) => [k, Math.max(1, v)]));
+        this.out.port.postMessage({ cfg: { deaf: false, vol, out: Math.max(1, S.get('out_volume') / 100), muted: [] } });
+      } else this.out.port.postMessage({ cfg: { deaf: this.deaf, vol: S.get('user_volumes') || {}, out: S.get('out_volume') / 100, muted: this.localMuted || [] } });
+    }
   }
   setMuted(on) { this.muted = on; this.apply(); }
   setDeaf(on) { this.deaf = on; this.apply(); }
   setLocalMuted(list) { this.localMuted = list; this.apply(); }
+  setOwnerLock(on) { this.ownerLock = on; this.apply(); }
   receive(uid, bytes) { if (this.out) this.out.port.postMessage({ uid, pkt: bytes }); }
   // soundboard: I hear it and it's mixed into what I send
   playToCall(buffer, vol) {

@@ -112,9 +112,9 @@ function CallScreen() {
     { ic: '🔊', label: 'Soundboard', fn: soundboard },
     s.cam ? { ic: '🔄', label: 'Flip camera', fn: () => s.flipCam() } : null,
     { ic: s.speaker ? '📱' : '🔈', label: s.speaker ? 'Use the earpiece' : 'Use the loudspeaker', fn: () => s.setSpeaker(!s.speaker) },
-    { ic: '🎧', label: s.deaf ? 'Undeafen' : 'Deafen (hear nothing)', fn: () => s.setDeaf(!s.deaf) },
+    s.ownerHere() === null ? { ic: '🎧', label: s.deaf ? 'Undeafen' : 'Deafen (hear nothing)', fn: () => s.setDeaf(!s.deaf) } : null,
     notIn.length ? { ic: '📳', label: 'Ring someone into the call', fn: () => ctx.menu(notIn.map((u) => ({ label: st.name(u), fn: () => ctx.api('call_ring', { user_id: u }) })), tr('Ring someone into the call')) } : null,
-    ...[...s.members.keys()].filter((u) => u !== me).map((u) => ({ ic: '🙉', label: (s.localMuted.has(u) ? tr('🙉 Unmute for me').replace('🙉 ', '') : tr('🙉 Mute for me').replace('🙉 ', '')) + ' · ' + st.name(u), fn: () => s.toggleLocalMute(u) })),
+    ...[...s.members.keys()].filter((u) => u !== me && s.ownerHere() === null).map((u) => ({ ic: '🙉', label: (s.localMuted.has(u) ? tr('🙉 Unmute for me').replace('🙉 ', '') : tr('🙉 Mute for me').replace('🙉 ', '')) + ' · ' + st.name(u), fn: () => s.toggleLocalMute(u) })),
     { ic: '💬', label: 'Open chat', fn: () => { ctx.callFull = false; ctx.bus.emit('callstate'); ctx.openChat(s.chatId); } },
   ]);
   const dur = fmtDur(Date.now() / 1000 - s.started);
@@ -122,7 +122,8 @@ function CallScreen() {
     <div class="row" style=${{ padding: 'calc(8px + env(safe-area-inset-top)) 10px 0', color: '#fff' }}>
       <button class="iconbtn" style=${{ color: '#fff' }} onClick=${() => { ctx.callFull = false; ctx.bus.emit('callstate'); }}>${I('⬇️')}</button>
       <div class="grow"><b>${c ? st.chatTitle(c) : ''}</b><div class="small" style=${{ opacity: 0.7 }}>${dur}${s.ringing.size ? tr('  ·  🔔 ringing ') : ''}
-        ${ctx.net.bytes ? ` · ↑${Math.round(ctx.net.bytes.up / 1024)}K ↓${Math.round(ctx.net.bytes.down / 1024)}K` : ''}</div></div></div>
+        ${ctx.net.bytes ? ` · ↑${Math.round(ctx.net.bytes.up / 1024)}K ↓${Math.round(ctx.net.bytes.down / 1024)}K` : ''}</div>
+        ${s.ownerHere() !== null ? html`<div class="small" style=${{ color: '#ff8a8a', fontWeight: 700 }}>${I('🔒')} ${st.name(s.ownerHere())} ${tr('is here: deafen & muting locked')}</div>` : null}</div></div>
     <div class="tiles" style=${{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}>
       ${shown.map(([uid, kind]) => html`<${Tile} key=${uid + ':' + kind} uid=${uid} kind=${kind} focus=${!!focus}
         onTap=${() => setFocus(focus ? null : `${uid}:${kind}`)} />`)}</div>

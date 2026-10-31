@@ -36,6 +36,7 @@ export class CallSession {
     }
     if (this.audio.error) this.ctx.toast(this.audio.error, 'error', 5000);
     this.ctx.music && this.ctx.music.update();
+    this.updateLock();
     this.outgoingTone();
   }
   onMedia(uid, kind, bytes) {
@@ -55,6 +56,7 @@ export class CallSession {
     if (!call) return;
     const old = new Set(this.members.keys());
     this.members = new Map(call.members.map((m) => [m.user_id, m]));
+    this.updateLock();
     this.ringing = new Set(call.ringing || []);
     const nw = new Set(this.members.keys());
     const me = this.ctx.store.myId;
@@ -84,7 +86,24 @@ export class CallSession {
     this.ctx.try(this.ctx.api('call_state', { muted: on }));
     this.ctx.bus.emit('callstate');
   }
+  // the Smult owner is in this call (and it isn't me): deafen and muting people are locked while they're here
+  ownerHere() {
+    const st = this.ctx.store;
+    if ((st.me || {}).role === 'owner') return null;
+    for (const uid of this.members.keys()) if (uid !== st.myId && (st.users[uid] || {}).role === 'owner') return uid;
+    return null;
+  }
+  updateLock() {
+    const on = this.ownerHere() !== null;
+    if (on && !this.audio.ownerLock) {
+      this.localMuted.clear();
+      this.audio.setLocalMuted([]);
+      if (this.deaf) { this.deaf = false; this.audio.setDeaf(false); this.ctx.try(this.ctx.api('call_state', { deaf: false, muted: this.muted })); }
+    }
+    this.audio.setOwnerLock(on);
+  }
   setDeaf(on) {
+    if (on && this.ownerHere() !== null) return this.ctx.toast(`🔒 ${this.ctx.store.name(this.ownerHere())} is in this call: you can't deafen right now (you can still leave)`, 'error');
     this.deaf = on;
     this.audio.setDeaf(on);
     this.ctx.play(on ? 'mute' : 'unmute', { vol: 0.35 });
@@ -149,6 +168,7 @@ export class CallSession {
     } catch (e) { this.ctx.toast(`Can't play ${s.name}: ${e.message || e}`, 'error'); }
   }
   toggleLocalMute(uid) {
+    if (this.ownerHere() !== null) return this.ctx.toast('🔒 Muting people is locked while the Smult owner is in the call', 'error');
     if (this.localMuted.has(uid)) this.localMuted.delete(uid); else this.localMuted.add(uid);
     this.audio.setLocalMuted([...this.localMuted]);
     this.ctx.bus.emit('callstate');
